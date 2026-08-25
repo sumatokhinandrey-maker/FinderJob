@@ -61,11 +61,7 @@ def _city_allowed(vacancy: Vacancy, rules: dict) -> bool:
     if not city:
         return True
     allowed = [c.lower() for c in rules.get("cities", [])]
-    if any(city == c or c in city for c in allowed):
-        return True
-    if rules.get("abroad") and vacancy.country and vacancy.country != "RU":
-        return True
-    return False
+    return any(city == c or c in city for c in allowed)
 
 
 def check(vacancy: Vacancy, profile: dict) -> str | None:

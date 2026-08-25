@@ -53,10 +53,12 @@ def chunks(text: str) -> list[str]:
     return parts
 
 
-def send(chat_id: int | str, text: str, keyboard: list | None = None) -> None:
+def send(chat_id: int | str, text: str, keyboard: list | None = None) -> int | None:
     """Длинное сообщение уходит частями, кнопки вешаем на последнюю —
-    иначе они уедут в середину простыни."""
+    иначе они уедут в середину простыни. Возвращаем id последней части:
+    её потом правит мастер настройки."""
     parts = chunks(text)
+    message_id = None
     for index, part in enumerate(parts):
         params: dict = {
             "chat_id": chat_id,
@@ -66,7 +68,8 @@ def send(chat_id: int | str, text: str, keyboard: list | None = None) -> None:
         }
         if keyboard is not None and index == len(parts) - 1:
             params["reply_markup"] = {"inline_keyboard": keyboard}
-        call("sendMessage", **params)
+        message_id = call("sendMessage", **params).get("message_id")
+    return message_id
 
 
 def edit(chat_id: int | str, message_id: int, text: str, keyboard: list | None) -> None:

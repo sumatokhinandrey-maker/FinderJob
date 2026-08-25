@@ -33,10 +33,7 @@ FORMATS = [
     ("office", "Офис"),
 ]
 
-CITIES = [
-    ("Москва", "Москва"),
-    ("Санкт-Петербург", "Санкт-Петербург"),
-]
+QUICK_CITIES = ["Москва", "Санкт-Петербург"]
 
 
 def blank() -> dict:
@@ -48,7 +45,6 @@ def blank() -> dict:
         "formats": [],
         "any_city": True,
         "cities": [],
-        "abroad": False,
     }
 
 
@@ -87,7 +83,6 @@ def to_filters(profile: dict) -> dict:
             **chosen,
             "any_city": profile.get("any_city", True),
             "cities": profile.get("cities") or [],
-            "abroad": profile.get("abroad", False),
         },
     }
 
@@ -129,10 +124,8 @@ def describe_cities(profile: dict) -> str:
             return "не спрашиваем, ты выбрал только удалёнку"
         return "не спрашиваем, пока формат работы не важен"
     if profile.get("any_city"):
-        return "любой город"
+        return ANY
     parts = list(profile.get("cities") or [])
-    if profile.get("abroad"):
-        parts.append("за границей")
     return ", ".join(parts) if parts else ANY
 
 

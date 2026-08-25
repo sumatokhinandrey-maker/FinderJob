@@ -49,6 +49,33 @@ def first_digest(user: dict) -> None:
     store.save_user(user)
 
 
+def _open_step(user: dict, step: str, mode: str) -> None:
+    """Показать шаг новой карточкой и запомнить её id: следующие нажатия
+    правят её на месте, а не плодят копии."""
+    user["awaiting"] = None
+    user["mode"] = mode
+    user["step"] = step
+    body, keyboard = wizard.render(step, user["profile"], mode)
+    user["card"] = tg.send(user["chat_id"], body, keyboard)
+    store.save_user(user)
+
+
+def _city_typed(user: dict, text: str) -> None:
+    """Человек прислал название города текстом."""
+    name = wizard.add_city(user["profile"], text)
+    user["awaiting"] = None
+    store.save_user(user)
+
+    body, keyboard = wizard.render("cities", user["profile"], user.get("mode", "setup"))
+    body = f"Добавил: {name}\n\n" + body
+    card = user.get("card")
+    if card:
+        tg.edit(user["chat_id"], card, body, keyboard)
+    else:
+        user["card"] = tg.send(user["chat_id"], body, keyboard)
+        store.save_user(user)
+
+
 def _user(chat: dict) -> dict:
     existing = store.load_user(chat["id"])
     if existing:
@@ -72,17 +99,21 @@ def handle_message(message: dict) -> None:
     user = _user(chat)
 
     if text.startswith("/start"):
-        user["mode"] = "setup"
-        user["step"] = "grade"
-        store.save_user(user)
-        body, keyboard = wizard.render("grade", user["profile"], "setup")
-        tg.send(chat["id"], wizard.START + "\n\n" + body, keyboard)
+        _open_step(user, "grade", "setup")
         return
 
-    if text.startswith("/settings"):
+    if user.get("awaiting") == "city" and not text.startswith("/"):
+        _city_typed(user, text)
+        return
+
+    if text.startswith("/setting"):
+        user["awaiting"] = None
+        user["mode"] = "edit"
+        user["step"] = None
         store.save_user(user)
         body, keyboard = wizard.render_settings(user["profile"])
-        tg.send(chat["id"], body, keyboard)
+        user["card"] = tg.send(chat["id"], body, keyboard)
+        store.save_user(user)
         return
 
     tg.send(chat["id"], wizard.HELP)
@@ -116,6 +147,21 @@ def handle_callback(callback: dict) -> None:
         user["step"] = data[3:]
         body, keyboard = wizard.render(user["step"], profile, "edit")
 
+    elif data == "tc:input":
+        user["awaiting"] = "city"
+        body, keyboard = wizard.ASK_CITY, []
+
+    elif data.startswith("bk:"):
+        # В режиме правки «Назад» уводит в список настроек, а не на шаг раньше:
+        # человек пришёл поменять один пункт, а не проходить мастер заново.
+        if user.get("mode") == "edit":
+            user["step"] = None
+            body, keyboard = wizard.render_settings(profile)
+        else:
+            earlier = wizard.prev_step(data[3:], profile) or "grade"
+            user["step"] = earlier
+            body, keyboard = wizard.render(earlier, profile, "setup")
+
     elif data.startswith("nx:") or data.startswith("sl:"):
         # Зарплата — выбор из одного варианта, поэтому после неё сразу дальше,
         # лишнее нажатие «Дальше» тут ничего не решает.
@@ -139,6 +185,8 @@ def handle_callback(callback: dict) -> None:
         step = user.get("step") or "grade"
         body, keyboard = wizard.render(step, profile, user.get("mode", "setup"))
 
+    if message_id:
+        user["card"] = message_id
     store.save_user(user)
     if message_id:
         tg.edit(chat["id"], message_id, body, keyboard)
