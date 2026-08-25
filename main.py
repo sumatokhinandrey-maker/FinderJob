@@ -27,6 +27,21 @@ from sources import hirehi
 ROOT = Path(__file__).parent
 
 
+def load_env() -> None:
+    """Подтягиваем .env, если он есть. Файл в .gitignore и нужен только для
+    локальных запусков — в GitHub Actions те же имена приходят из секретов.
+    Уже заданные переменные окружения не перетираем."""
+    path = ROOT / ".env"
+    if not path.exists():
+        return
+    for line in path.read_text("utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Дайджест вакансий для дизайнеров")
     parser.add_argument(
@@ -36,6 +51,8 @@ def main() -> int:
     parser.add_argument("--days", type=int, help="за сколько дней смотреть")
     parser.add_argument("--json", action="store_true", help="выгрузить результат в JSON")
     args = parser.parse_args()
+
+    load_env()
 
     config = json.loads((ROOT / "config.json").read_text("utf-8"))
     profile = config["profile"]
@@ -59,7 +76,7 @@ def main() -> int:
 
     digest = core.build_digest(fresh, rejected, scanned=len(vacancies))
     print("\n" + "─" * 60)
-    print(digest.replace("<b>", "").replace("</b>", "").replace("<i>", "").replace("</i>", ""))
+    print(core.to_plain(digest))
     print("─" * 60 + "\n")
 
     if args.dry_run:

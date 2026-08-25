@@ -3,3 +3,4 @@ __pycache__/
 last_run.json
 .venv/
 .DS_Store
+.env

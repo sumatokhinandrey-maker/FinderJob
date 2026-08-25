@@ -14,6 +14,7 @@ import re
 import time
 import urllib.error
 import urllib.request
+from html import unescape
 
 from core import Vacancy
 
@@ -59,6 +60,13 @@ def list_recent(since: str) -> list[str]:
     return [loc for loc, _ in recent]
 
 
+def _text(value: object) -> str:
+    """hirehi отдаёт в JSON-LD уже экранированный HTML («Wildberries &amp; Russ»).
+    Раскодируем на входе — экранировать перед отправкой умеет core._escape,
+    иначе амперсанд уедет в телеграм как «&amp;amp;»."""
+    return unescape(str(value or "")).strip()
+
+
 def _job_posting(html: str) -> dict | None:
     for block in _LD_RE.findall(html):
         try:
@@ -80,7 +88,7 @@ def _parse_work_format(html: str) -> tuple[str, str | None]:
     match = _META_DESC_RE.search(html)
     if not match:
         return "unknown", None
-    desc = match.group(1)
+    desc = unescape(match.group(1))
 
     if re.search(r"Удал[её]нная работа", desc):
         return "remote", None
@@ -124,18 +132,18 @@ def parse_vacancy(url: str, html: str) -> Vacancy | None:
     return Vacancy(
         id=f"hirehi:{vacancy_id}",
         source="hirehi",
-        title=(posting.get("title") or "").strip(),
-        company=(posting.get("hiringOrganization", {}).get("name") or "").strip(),
+        title=_text(posting.get("title")),
+        company=_text(posting.get("hiringOrganization", {}).get("name")),
         grade=grade_match.group(1).lower() if grade_match else None,
         salary=_parse_salary(posting),
         work_format=work_format,
-        city=address.get("addressLocality") or fmt_city,
+        city=_text(address.get("addressLocality")) or fmt_city,
         country=address.get("addressCountry"),
         url=posting.get("url") or url,
         posted_at=(posting.get("datePosted") or "")[:10],
         experience_months=experience.get("monthsOfExperience"),
-        description=posting.get("description") or "",
-        skills=posting.get("skills") or "",
+        description=_text(posting.get("description")),
+        skills=_text(posting.get("skills")),
     )
 
 

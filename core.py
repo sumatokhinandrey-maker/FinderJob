@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from html import unescape
 from dataclasses import asdict, dataclass
 from datetime import date, timedelta
 from pathlib import Path
@@ -204,6 +205,16 @@ def _plural(n: int) -> str:
     if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
         return "новые"
     return "новых"
+
+
+_TAG_RE = re.compile(r"</?[a-z]+>")
+
+
+def to_plain(digest: str) -> str:
+    """Дайджест как его увидит человек в телеграме — без тегов и без сущностей.
+    Нужно для --dry-run: иначе в консоли мелькает «&amp;» и непонятно, баг это
+    или нормальное экранирование."""
+    return unescape(_TAG_RE.sub("", digest))
 
 
 def to_json(vacancies: list[Vacancy]) -> str:
