@@ -61,8 +61,12 @@ def new_user(chat_id: int, username: str | None, today: str) -> dict:
 
 
 def needs_cities(profile: dict) -> bool:
-    """Про города спрашиваем, только если человек готов куда-то ездить."""
+    """Про города спрашиваем, только если человек готов куда-то ездить.
+    Пустой список форматов — это «не важно», то есть офис и гибрид тоже
+    подходят, и город снова имеет значение."""
     formats = profile.get("formats") or []
+    if not formats:
+        return True
     return "hybrid" in formats or "office" in formats
 
 
@@ -118,11 +122,9 @@ def describe_formats(profile: dict) -> str:
 
 def describe_cities(profile: dict) -> str:
     if not needs_cities(profile):
-        # Города имеют смысл только для гибрида и офиса. Разводим два случая:
-        # человек выбрал одну удалёнку — и человек не выбрал ничего.
-        if profile.get("formats"):
-            return "не спрашиваем, ты выбрал только удалёнку"
-        return "не спрашиваем, пока формат работы не важен"
+        # Единственный случай, когда города не спрашиваем, — выбрана
+        # только удалёнка.
+        return "не спрашиваем, ты выбрал только удалёнку"
     if profile.get("any_city"):
         return ANY
     parts = list(profile.get("cities") or [])
