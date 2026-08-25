@@ -122,7 +122,11 @@ def describe_formats(profile: dict) -> str:
 
 def describe_cities(profile: dict) -> str:
     if not needs_cities(profile):
-        return "не спрашиваем, ты выбрал только удалёнку"
+        # Города имеют смысл только для гибрида и офиса. Разводим два случая:
+        # человек выбрал одну удалёнку — и человек не выбрал ничего.
+        if profile.get("formats"):
+            return "не спрашиваем, ты выбрал только удалёнку"
+        return "не спрашиваем, пока формат работы не важен"
     if profile.get("any_city"):
         return "любой город"
     parts = list(profile.get("cities") or [])
