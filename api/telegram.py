@@ -36,11 +36,11 @@ def first_digest(user: dict) -> None:
         return
 
     vacancies = core.from_rows(rows)
-    passed, rejected = core.apply_filters(vacancies, prof.to_filters(user["profile"]))
+    passed, _ = core.apply_filters(vacancies, prof.to_filters(user["profile"]))
     seen = user.get("seen") or {}
     fresh = core.only_new(passed, seen)
 
-    tg.send(user["chat_id"], core.build_digest(fresh, rejected, len(vacancies)))
+    tg.send(user["chat_id"], core.build_digest(fresh))
 
     today = date.today().isoformat()
     for vacancy in fresh:

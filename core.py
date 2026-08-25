@@ -40,8 +40,8 @@ class Vacancy:
 # фильтр
 # --------------------------------------------------------------------------
 
-# Причины отсева. Нужны, чтобы в дайджесте показать, что бот работал,
-# даже когда подходящего нет — иначе молчание неотличимо от поломки.
+# Причины отсева. В сообщение не идут — человеку они не нужны;
+# остаются в логах рассылки, чтобы было видно, как работают фильтры.
 REASONS = {
     "grade": "грейд",
     "role": "не та роль",
@@ -166,25 +166,15 @@ def _line(vacancy: Vacancy) -> str:
     )
 
 
-def build_digest(
-    vacancies: list[Vacancy], rejected: dict[str, int], scanned: int
-) -> str:
+def build_digest(vacancies: list[Vacancy]) -> str:
     today = date.today()
     header = f"<b>Дайджест {today.day} {MONTHS[today.month - 1]}</b>"
 
     if not vacancies:
-        body = "\nСегодня ничего нового по твоим фильтрам."
-    else:
-        header += f" · {len(vacancies)} " + _plural(len(vacancies))
-        body = "\n\n" + "\n\n".join(_line(v) for v in vacancies)
+        return header + "\nСегодня ничего нового по твоим фильтрам."
 
-    parts = [f"{REASONS.get(k, k)} {v}" for k, v in sorted(rejected.items())]
-    footer = f"\n\n<i>Просмотрено {scanned}"
-    if parts:
-        footer += ", отсеяно: " + ", ".join(parts)
-    footer += "</i>"
-
-    return header + body + footer
+    header += f" · {len(vacancies)} " + _plural(len(vacancies))
+    return header + "\n\n" + "\n\n".join(_line(v) for v in vacancies)
 
 
 def _plural(n: int) -> str:

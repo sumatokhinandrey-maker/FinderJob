@@ -57,9 +57,14 @@ def deliver(user: dict, vacancies: list, dry_run: bool) -> int:
     seen = user.get("seen") or {}
     fresh = core.only_new(passed, seen)
 
-    digest = core.build_digest(fresh, rejected, scanned=len(vacancies))
+    digest = core.build_digest(fresh)
     label = user.get("username") or user["chat_id"]
+    breakdown = ", ".join(
+        f"{core.REASONS.get(k, k)} {v}" for k, v in sorted(rejected.items())
+    )
     print(f"\n--- {label}: подошло {len(passed)}, из них новых {len(fresh)}")
+    if breakdown:
+        print(f"    отсеяно: {breakdown}")
     print(core.to_plain(digest))
 
     if dry_run:
