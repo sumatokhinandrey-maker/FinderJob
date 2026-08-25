@@ -74,9 +74,18 @@ def needs_cities(profile: dict) -> bool:
     return "hybrid" in formats or "office" in formats
 
 
-def place_set(profile: dict) -> bool:
-    """Задано ли хоть что-то на шаге места."""
-    return bool(profile.get("places") or profile.get("cities"))
+def step_filled(profile: dict, step: str) -> bool:
+    """Выбрано ли хоть что-то на шаге. Пока не выбрано, «Далее» ничем
+    не отличается от «Пропустить», поэтому его не показываем."""
+    if step == "grade":
+        return bool(profile.get("grades"))
+    if step == "salary":
+        return bool(profile.get("salary_min") or profile.get("salary_max"))
+    if step == "format":
+        return bool(profile.get("formats"))
+    if step == "cities":
+        return bool(profile.get("places") or profile.get("cities"))
+    return False
 
 
 def to_filters(profile: dict) -> dict:

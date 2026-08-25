@@ -112,6 +112,9 @@ def prev_step(step: str, profile: dict) -> str | None:
 def _tail(step: str, profile: dict, mode: str) -> list[list[dict]]:
     """Хвост любого шага: пропустить, назад и далее.
 
+    «Далее» появляется только когда на шаге что-то выбрано: на пустом шаге
+    оно означало бы ровно то же, что «Пропустить».
+
     На первом шаге назад некуда. В режиме правки из /settings назад ведёт
     в список настроек: человек пришёл поменять один пункт, а не проходить
     мастер заново.
@@ -119,8 +122,13 @@ def _tail(step: str, profile: dict, mode: str) -> list[list[dict]]:
     nav = []
     if mode == "edit" or prev_step(step, profile):
         nav.append(_button("Назад", f"bk:{step}"))
-    nav.append(_button("Сохранить" if mode == "edit" else "Далее", f"nx:{step}"))
-    return [[_button("Пропустить", f"sk:{step}")], nav]
+    if prof.step_filled(profile, step):
+        nav.append(_button("Сохранить" if mode == "edit" else "Далее", f"nx:{step}"))
+
+    rows = [[_button("Пропустить", f"sk:{step}")]]
+    if nav:
+        rows.append(nav)
+    return rows
 
 
 def keyboard(step: str, profile: dict, mode: str) -> list[list[dict]]:

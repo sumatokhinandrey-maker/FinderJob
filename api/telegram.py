@@ -123,6 +123,10 @@ def handle_message(message: dict) -> None:
     user = _user(chat)
 
     if text.startswith("/start"):
+        # «Перезапустить бота» — значит с чистого листа: иначе человек видит
+        # галочки с прошлого прохода и принимает их за выбор по умолчанию.
+        # Память о показанных вакансиях при этом не трогаем.
+        user["profile"] = prof.blank()
         _open_step(user, "grade", "setup")
         return
 
@@ -157,6 +161,8 @@ def handle_callback(callback: dict) -> None:
     finished = False
 
     if data == "go":
+        # «Задать заново» из настроек — тоже с чистого листа.
+        user["profile"] = profile = prof.blank()
         user["mode"] = "setup"
         user["step"] = "grade"
         body, keyboard = wizard.render("grade", profile, "setup")
