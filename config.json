@@ -1,0 +1,29 @@
+{
+  "lookback_days": 2,
+
+  "profile": {
+    "grades": ["middle"],
+
+    "include_any": [
+      "ux", "ui", "продуктовый дизайнер", "product designer",
+      "дизайнер интерфейсов", "интерфейс"
+    ],
+
+    "exclude_any": [
+      "графический дизайн", "полиграф", "иллюстратор", "моушн", "motion",
+      "3d", "гейм-дизайнер", "game designer", "концепт-художник",
+      "арт-директор", "art director", "видеомонтаж", "смм", "smm",
+      "презентац", "упаковк", "брендинг"
+    ],
+
+    "work_formats": {
+      "remote": true,
+      "hybrid": true,
+      "hybrid_cities": ["Москва", "Санкт-Петербург", "Питер", "СПб"],
+      "hybrid_abroad": true,
+      "office": false
+    },
+
+    "salary_min": 180000
+  }
+}
