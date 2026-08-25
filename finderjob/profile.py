@@ -34,7 +34,7 @@ PLACES = [
     ("abroad", "За рубежом"),
 ]
 
-ANY = "пропущено"
+ANY = "неважно"
 
 
 def blank() -> dict:
