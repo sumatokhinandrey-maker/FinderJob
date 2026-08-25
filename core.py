@@ -10,7 +10,6 @@ from datetime import date, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).parent
-SEEN_PATH = ROOT / "seen.json"
 
 
 @dataclass
@@ -52,17 +51,21 @@ REASONS = {
 }
 
 
-def _hybrid_allowed(vacancy: Vacancy, rules: dict) -> bool:
-    """Гибрид разрешён только в перечисленных городах либо за границей."""
+def _city_allowed(vacancy: Vacancy, rules: dict) -> bool:
+    """Город подходит? Касается только гибрида и офиса — на удалёнку не влияет."""
+    if rules.get("any_city", True):
+        return True
     city = (vacancy.city or "").strip().lower()
-    allowed = [c.lower() for c in rules.get("hybrid_cities", [])]
+    # Город не указан вовсе — не угадываем, пропускаем дальше,
+    # решать будет человек.
+    if not city:
+        return True
+    allowed = [c.lower() for c in rules.get("cities", [])]
     if any(city == c or c in city for c in allowed):
         return True
-    if rules.get("hybrid_abroad") and vacancy.country and vacancy.country != "RU":
+    if rules.get("abroad") and vacancy.country and vacancy.country != "RU":
         return True
-    # Город не указан вовсе — не угадываем, пропускаем дальше как подходящий,
-    # решать будет человек.
-    return not city
+    return False
 
 
 def check(vacancy: Vacancy, profile: dict) -> str | None:
@@ -84,11 +87,11 @@ def check(vacancy: Vacancy, profile: dict) -> str | None:
     formats = profile.get("work_formats", {})
     if vacancy.work_format == "remote" and not formats.get("remote", True):
         return "format"
-    if vacancy.work_format == "hybrid":
-        if not formats.get("hybrid", True) or not _hybrid_allowed(vacancy, formats):
+    if vacancy.work_format in ("hybrid", "office"):
+        if not formats.get(vacancy.work_format, True):
             return "format"
-    if vacancy.work_format == "office" and not formats.get("office", False):
-        return "format"
+        if not _city_allowed(vacancy, formats):
+            return "format"
 
     minimum = profile.get("salary_min")
     if minimum and vacancy.salary is not None and vacancy.salary < minimum:
@@ -115,22 +118,11 @@ def apply_filters(
 # --------------------------------------------------------------------------
 
 
-def load_seen() -> dict:
-    if not SEEN_PATH.exists():
-        return {}
-    try:
-        return json.loads(SEEN_PATH.read_text("utf-8"))
-    except json.JSONDecodeError:
-        return {}
-
-
-def save_seen(seen: dict, keep_days: int = 90) -> None:
-    """Храним id с датой показа и подчищаем старое, чтобы файл не рос вечно."""
+def trim_seen(seen: dict, keep_days: int = 90) -> dict:
+    """Подчищаем старое, чтобы память пользователя не росла вечно.
+    Полгода спустя вакансия всё равно закрыта — показать её повторно не страшно."""
     cutoff = (date.today() - timedelta(days=keep_days)).isoformat()
-    fresh = {k: v for k, v in seen.items() if v >= cutoff}
-    SEEN_PATH.write_text(
-        json.dumps(fresh, ensure_ascii=False, indent=1, sort_keys=True), "utf-8"
-    )
+    return {k: v for k, v in seen.items() if v >= cutoff}
 
 
 def only_new(vacancies: list[Vacancy], seen: dict) -> list[Vacancy]:
@@ -182,7 +174,7 @@ def build_digest(
     vacancies: list[Vacancy], rejected: dict[str, int], scanned: int
 ) -> str:
     today = date.today()
-    header = f"🎯 <b>Дайджест {today.day} {MONTHS[today.month - 1]}</b>"
+    header = f"<b>Дайджест {today.day} {MONTHS[today.month - 1]}</b>"
 
     if not vacancies:
         body = "\nСегодня ничего нового по твоим фильтрам."

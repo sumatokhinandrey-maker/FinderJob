@@ -1,36 +1,42 @@
 #!/usr/bin/env python3
-"""JobResearch — ежедневный дайджест новых вакансий для UX/UI и продуктовых дизайнеров.
+"""Ежедневный дайджест FinderJob.
+
+Один обход hirehi на всех: вакансии собираются один раз, а дальше каждому
+подписчику применяются его собственные фильтры и его собственная память
+о показанном.
 
 Запуск:
     python3 main.py --dry-run      посмотреть результат, ничего не отправляя
-    python3 main.py --limit 30     обойти только 30 свежих страниц (быстрая проверка)
-    python3 main.py                собрать и отправить в Telegram
+    python3 main.py --limit 30     обойти только 30 свежих страниц
+    python3 main.py                собрать и разослать
 
-Токен и чат берутся из переменных окружения TELEGRAM_TOKEN и TELEGRAM_CHAT_ID.
+Токен берётся из TELEGRAM_TOKEN, хранилище — из KV_REST_API_URL
+и KV_REST_API_TOKEN. Локально всё это можно положить в .env.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from datetime import date, timedelta
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
-
-import core
-import telegram
-from sources import hirehi
-
 ROOT = Path(__file__).parent
+sys.path.insert(0, str(ROOT))
+
+import core  # noqa: E402
+from finderjob import profile as prof  # noqa: E402
+from finderjob import store, tg  # noqa: E402
+from sources import hirehi  # noqa: E402
 
 
 def load_env() -> None:
     """Подтягиваем .env, если он есть. Файл в .gitignore и нужен только для
     локальных запусков — в GitHub Actions те же имена приходят из секретов.
     Уже заданные переменные окружения не перетираем."""
+    import os
+
     path = ROOT / ".env"
     if not path.exists():
         return
@@ -42,6 +48,33 @@ def load_env() -> None:
         os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
 
 
+def deliver(user: dict, vacancies: list, dry_run: bool) -> int:
+    """Готовим и отправляем дайджест одному человеку. Возвращаем,
+    сколько вакансий ему ушло."""
+    filters = prof.to_filters(user["profile"])
+    passed, rejected = core.apply_filters(vacancies, filters)
+
+    seen = user.get("seen") or {}
+    fresh = core.only_new(passed, seen)
+
+    digest = core.build_digest(fresh, rejected, scanned=len(vacancies))
+    label = user.get("username") or user["chat_id"]
+    print(f"\n--- {label}: подошло {len(passed)}, из них новых {len(fresh)}")
+    print(core.to_plain(digest))
+
+    if dry_run:
+        return len(fresh)
+
+    tg.send(user["chat_id"], digest)
+
+    today = date.today().isoformat()
+    for vacancy in fresh:
+        seen[vacancy.id] = today
+    user["seen"] = core.trim_seen(seen)
+    store.save_user(user)
+    return len(fresh)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Дайджест вакансий для дизайнеров")
     parser.add_argument(
@@ -49,13 +82,18 @@ def main() -> int:
     )
     parser.add_argument("--limit", type=int, help="ограничить число страниц")
     parser.add_argument("--days", type=int, help="за сколько дней смотреть")
-    parser.add_argument("--json", action="store_true", help="выгрузить результат в JSON")
+    parser.add_argument("--json", action="store_true", help="выгрузить сбор в JSON")
     args = parser.parse_args()
 
     load_env()
 
+    users = store.all_users()
+    print(f"Подписчиков: {len(users)}")
+    if not users:
+        print("Никого нет — обходить hirehi незачем.")
+        return 0
+
     config = json.loads((ROOT / "config.json").read_text("utf-8"))
-    profile = config["profile"]
     days = args.days or config.get("lookback_days", 2)
     since = (date.today() - timedelta(days=days)).isoformat()
 
@@ -63,43 +101,22 @@ def main() -> int:
     vacancies = hirehi.collect(since, limit=args.limit)
     print(f"Найдено на hirehi: {len(vacancies)}")
 
-    passed, rejected = core.apply_filters(vacancies, profile)
-    print(f"Прошло фильтр: {len(passed)}")
-
-    seen = core.load_seen()
-    fresh = core.only_new(passed, seen)
-    print(f"Из них новых (не показывали раньше): {len(fresh)}")
-
     if args.json:
-        (ROOT / "last_run.json").write_text(core.to_json(fresh), "utf-8")
+        (ROOT / "last_run.json").write_text(core.to_json(vacancies), "utf-8")
         print("Записано в last_run.json")
 
-    digest = core.build_digest(fresh, rejected, scanned=len(vacancies))
-    print("\n" + "─" * 60)
-    print(core.to_plain(digest))
-    print("─" * 60 + "\n")
+    sent = 0
+    for user in users:
+        try:
+            sent += deliver(user, vacancies, args.dry_run)
+        except Exception as exc:
+            # Один упавший подписчик не должен ронять рассылку остальным.
+            # Чаще всего это «bot was blocked by the user».
+            print(f"  ! не доставлено {user.get('chat_id')}: {exc}")
 
+    print(f"\nВсего отправлено вакансий: {sent}")
     if args.dry_run:
         print("dry-run: ничего не отправлено, память не тронута")
-        return 0
-
-    token = os.environ.get("TELEGRAM_TOKEN")
-    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
-    if not token or not chat_id:
-        print(
-            "Нет TELEGRAM_TOKEN или TELEGRAM_CHAT_ID в окружении.\n"
-            "Запусти с --dry-run либо задай переменные — см. README."
-        )
-        return 1
-
-    telegram.send(token, chat_id, digest)
-    print("Отправлено в Telegram")
-
-    today = date.today().isoformat()
-    for vacancy in fresh:
-        seen[vacancy.id] = today
-    core.save_seen(seen)
-    print(f"Запомнено вакансий: {len(seen)}")
     return 0
 
 
