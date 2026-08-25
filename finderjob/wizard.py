@@ -1,7 +1,10 @@
 """Мастер настройки: тексты, кнопки и переходы между шагами.
 
-Весь диалог — одно сообщение, которое переписывается на месте. Человек видит
-не простыню из десяти карточек, а одну, которая меняется под его нажатия.
+Весь диалог — одна карточка, которая переписывается на месте. Человек видит
+не простыню из десяти сообщений, а один экран, который меняется под нажатия.
+
+«Пропустить» на любом шаге стирает критерий и ведёт дальше: незаполненное
+поле ничего не отсекает.
 """
 
 from __future__ import annotations
@@ -12,8 +15,8 @@ STEPS = ["grade", "salary", "format", "cities"]
 
 CHECK = "✓ "  # галочка перед выбранным пунктом
 
-# Описание бота — то, что видно в пустом чате до нажатия «Начать».
-# Ставится один раз через setMyDescription, здесь лежит как источник правды.
+# Описание бота — то, что видно в пустом чате до кнопки «Начать».
+# Ставится через setup_bot.py, здесь лежит как источник правды.
 DESCRIPTION = "Твой персональный дайджест актуальных вакансий на каждый день"
 
 COMMANDS = [
@@ -42,26 +45,30 @@ HELP = (
     "и веб-дизайн; графику, моушн и 3D отсекаю."
 )
 
-ASK_CITY = (
-    "<b>Шаг 4 из 4. Города</b>\n\n"
-    "Напиши название города одним сообщением. Например: Казань."
+ASK_SALARY = (
+    "<b>Шаг 2 из 4. Зарплата</b>\n\n"
+    "Напиши вилку одним сообщением. Понимаю по-разному:\n"
+    "150000-250000, от 150 до 250 тысяч, 150к, просто 200000."
 )
 
+ASK_CITIES = (
+    "<b>Шаг 4 из 4. Город</b>\n\n"
+    "Напиши город или несколько через запятую. Например: Москва, Казань."
+)
 
-def ask_city_keyboard() -> list[list[dict]]:
-    """Из ввода города надо уметь выйти, ничего не написав."""
-    return [[_button("Назад", "tc:cancel")]]
+BAD_SALARY = "Не нашёл в этом чисел. Напиши вилку цифрами, например 150000-250000."
+BAD_CITIES = "Не разобрал ни одного города. Напиши названия через запятую."
 
 QUESTIONS = {
     "grade": "<b>Шаг 1 из 4. Грейд</b>",
     "salary": (
         "<b>Шаг 2 из 4. Зарплата</b>\n\n"
-        "Нижняя граница. Вакансии без указанной вилки я пропускаю — "
+        "Вакансии без указанной вилки я пропускаю в любом случае — "
         "её указывает примерно каждая десятая."
     ),
     "format": "<b>Шаг 3 из 4. Формат работы</b>",
     "cities": (
-        "<b>Шаг 4 из 4. Города</b>\n\n"
+        "<b>Шаг 4 из 4. Город</b>\n\n"
         "Где готов ездить в офис. На удалённые вакансии это не влияет."
     ),
 }
@@ -81,8 +88,7 @@ def _rows(buttons: list[dict], per_row: int = 2) -> list[list[dict]]:
 
 
 def next_step(step: str, profile: dict) -> str | None:
-    """Шаг вперёд. Про города спрашиваем только тех, кто готов ездить, —
-    остальным этот вопрос ничего не даёт."""
+    """Шаг вперёд. Про место спрашиваем только тех, кто готов куда-то ездить."""
     for candidate in STEPS[STEPS.index(step) + 1 :]:
         if candidate == "cities" and not prof.needs_cities(profile):
             continue
@@ -103,14 +109,18 @@ def prev_step(step: str, profile: dict) -> str | None:
 # --------------------------------------------------------------------------
 
 
-def _nav(step: str, profile: dict, mode: str) -> list[dict]:
-    """Нижний ряд: назад и вперёд. На первом шаге назад некуда,
-    в режиме правки назад ведёт в список настроек."""
-    row = []
+def _tail(step: str, profile: dict, mode: str) -> list[list[dict]]:
+    """Хвост любого шага: пропустить, назад и далее.
+
+    На первом шаге назад некуда. В режиме правки из /settings назад ведёт
+    в список настроек: человек пришёл поменять один пункт, а не проходить
+    мастер заново.
+    """
+    nav = []
     if mode == "edit" or prev_step(step, profile):
-        row.append(_button("Назад", f"bk:{step}"))
-    row.append(_button("Сохранить" if mode == "edit" else "Дальше", f"nx:{step}"))
-    return row
+        nav.append(_button("Назад", f"bk:{step}"))
+    nav.append(_button("Сохранить" if mode == "edit" else "Далее", f"nx:{step}"))
+    return [[_button("Пропустить", f"sk:{step}")], nav]
 
 
 def keyboard(step: str, profile: dict, mode: str) -> list[list[dict]]:
@@ -120,23 +130,12 @@ def keyboard(step: str, profile: dict, mode: str) -> list[list[dict]]:
             _button(f"{CHECK if value in chosen else ''}{label}", f"tg:{value}")
             for value, label in prof.GRADES
         ]
-        return (
-            _rows(buttons)
-            + [[_button(f"{CHECK if not chosen else ''}Не важно", "ta:g")]]
-            + [_nav(step, profile, mode)]
-        )
+        return _rows(buttons) + _tail(step, profile, mode)
 
     if step == "salary":
-        current = profile.get("salary_min")
-        buttons = [
-            _button(f"{CHECK if current == value else ''}{label}", f"sl:{value}")
-            for value, label in prof.SALARIES
-        ]
-        return (
-            _rows(buttons)
-            + [[_button(f"{CHECK if not current else ''}Не важно", "sl:any")]]
-            + [_nav(step, profile, mode)]
-        )
+        current = prof.describe_salary(profile)
+        label = "Значение от — до" if current == prof.ANY else f"{CHECK}{current}"
+        return [[_button(label, "in:salary")]] + _tail(step, profile, mode)
 
     if step == "format":
         chosen = profile.get("formats") or []
@@ -144,35 +143,22 @@ def keyboard(step: str, profile: dict, mode: str) -> list[list[dict]]:
             _button(f"{CHECK if value in chosen else ''}{label}", f"tf:{value}")
             for value, label in prof.FORMATS
         ]
-        return (
-            _rows(buttons, 3)
-            + [[_button(f"{CHECK if not chosen else ''}Не важно", "ta:f")]]
-            + [_nav(step, profile, mode)]
-        )
+        return _rows(buttons, 3) + _tail(step, profile, mode)
 
     if step == "cities":
-        any_city = profile.get("any_city")
-        chosen = profile.get("cities") or []
-        # Москва и Питер — быстрые кнопки, остальные города человек вводит сам:
-        # зашивать список городов России в клавиатуру бессмысленно.
-        quick = [
-            _button(
-                f"{CHECK if not any_city and name in chosen else ''}{name}",
-                f"tc:{index}",
-            )
-            for index, name in enumerate(prof.QUICK_CITIES)
-        ]
-        extra = [name for name in chosen if name not in prof.QUICK_CITIES]
-        typed = [
-            _button(f"{CHECK}{name}", f"tx:{name[:40]}") for name in extra[:4]
-        ]
-        return (
-            _rows(quick)
-            + _rows(typed)
-            + [[_button("Ввести город", "tc:input")]]
-            + [[_button(f"{CHECK if any_city else ''}Не важно", "tc:any")]]
-            + [_nav(step, profile, mode)]
+        picked = profile.get("places") or []
+        rows = _rows(
+            [
+                _button(f"{CHECK if value in picked else ''}{label}", f"tp:{value}")
+                for value, label in prof.PLACES
+            ]
         )
+        # Города, введённые руками, показываем отдельными кнопками —
+        # так их видно и так же легко снять.
+        own = profile.get("cities") or []
+        rows += _rows([_button(f"{CHECK}{name}", f"tc:{name}") for name in own[:6]])
+        rows += [[_button("Свой город(а)", "in:cities")]]
+        return rows + _tail(step, profile, mode)
 
     return []
 
@@ -180,13 +166,18 @@ def keyboard(step: str, profile: dict, mode: str) -> list[list[dict]]:
 def settings_keyboard() -> list[list[dict]]:
     return [
         [_button("Грейд", "ed:grade"), _button("Зарплата", "ed:salary")],
-        [_button("Формат работы", "ed:format"), _button("Города", "ed:cities")],
+        [_button("Формат работы", "ed:format"), _button("Город", "ed:cities")],
         [_button("Задать заново", "go")],
     ]
 
 
 def done_keyboard() -> list[list[dict]]:
     return [[_button("Поменять критерии", "ed:menu")]]
+
+
+def input_keyboard(step: str) -> list[list[dict]]:
+    """Из ввода текста надо уметь выйти, ничего не написав."""
+    return [[_button("Назад", f"ca:{step}")]]
 
 
 def render(step: str, profile: dict, mode: str) -> tuple[str, list[list[dict]]]:
@@ -201,6 +192,13 @@ def render_settings(profile: dict) -> tuple[str, list[list[dict]]]:
 # применение нажатий
 # --------------------------------------------------------------------------
 
+CLEARS = {
+    "grade": ["grades"],
+    "salary": ["salary_min", "salary_max"],
+    "format": ["formats"],
+    "cities": ["places", "cities"],
+}
+
 
 def _toggle(items: list, value: str) -> None:
     if value in items:
@@ -209,54 +207,23 @@ def _toggle(items: list, value: str) -> None:
         items.append(value)
 
 
+def skip(step: str, profile: dict) -> None:
+    """«Пропустить» — стереть критерий этого шага."""
+    for field in CLEARS.get(step, []):
+        profile[field] = None if field.startswith("salary") else []
+
+
 def apply(data: str, user: dict) -> None:
     """Применяем нажатие к профилю. Переходы между шагами делает вызывающий."""
     profile = user["profile"]
 
     if data.startswith("tg:"):
         _toggle(profile.setdefault("grades", []), data[3:])
-
-    elif data == "ta:g":
-        profile["grades"] = []
-
-    elif data.startswith("sl:"):
-        value = data[3:]
-        profile["salary_min"] = None if value == "any" else int(value)
-
     elif data.startswith("tf:"):
         _toggle(profile.setdefault("formats", []), data[3:])
-
-    elif data == "ta:f":
-        profile["formats"] = []
-
-    elif data == "tc:any":
-        profile["any_city"] = True
-        profile["cities"] = []
-
+    elif data.startswith("tp:"):
+        _toggle(profile.setdefault("places", []), data[3:])
     elif data.startswith("tc:"):
-        profile["any_city"] = False
-        _toggle(profile.setdefault("cities", []), prof.QUICK_CITIES[int(data[3:])])
-        _fallback_to_any(profile)
-
-    elif data.startswith("tx:"):
-        profile["any_city"] = False
         _toggle(profile.setdefault("cities", []), data[3:])
-        _fallback_to_any(profile)
-
-
-def add_city(profile: dict, name: str) -> str:
-    """Город, введённый руками. Возвращает то, что записали."""
-    name = " ".join(name.split())[:40].strip("-—,. ")
-    name = name[:1].upper() + name[1:]
-    cities = profile.setdefault("cities", [])
-    if name not in cities:
-        cities.append(name)
-    profile["any_city"] = False
-    return name
-
-
-def _fallback_to_any(profile: dict) -> None:
-    """Человек снял все города — это снова «не важно», иначе он остался бы
-    вообще без вакансий с офисом."""
-    if not profile.get("cities"):
-        profile["any_city"] = True
+    elif data.startswith("sk:"):
+        skip(data[3:], profile)

@@ -60,14 +60,38 @@ def _open_step(user: dict, step: str, mode: str) -> None:
     store.save_user(user)
 
 
-def _city_typed(user: dict, text: str) -> None:
-    """Человек прислал название города текстом."""
-    name = wizard.add_city(user["profile"], text)
+def _typed(user: dict, text: str) -> None:
+    """Человек прислал вилку или список городов текстом."""
+    step = user["awaiting"]
+    profile = user["profile"]
+    note = ""
+
+    if step == "salary":
+        parsed = prof.parse_salary(text)
+        if parsed is None:
+            _show(user, wizard.BAD_SALARY, wizard.input_keyboard("salary"))
+            return
+        profile["salary_min"], profile["salary_max"] = parsed
+        note = f"Записал: {prof.describe_salary(profile)}"
+    else:
+        names = prof.parse_cities(text)
+        if not names:
+            _show(user, wizard.BAD_CITIES, wizard.input_keyboard("cities"))
+            return
+        cities = profile.setdefault("cities", [])
+        for name in names:
+            if name not in cities:
+                cities.append(name)
+        note = "Записал: " + ", ".join(names)
+
     user["awaiting"] = None
     store.save_user(user)
+    body, keyboard = wizard.render(step, profile, user.get("mode", "setup"))
+    _show(user, note + "\n\n" + body, keyboard)
 
-    body, keyboard = wizard.render("cities", user["profile"], user.get("mode", "setup"))
-    body = f"Добавил: {name}\n\n" + body
+
+def _show(user: dict, body: str, keyboard: list) -> None:
+    """Обновить карточку мастера на месте, а если её нет — завести новую."""
     card = user.get("card")
     if card:
         tg.edit(user["chat_id"], card, body, keyboard)
@@ -102,8 +126,8 @@ def handle_message(message: dict) -> None:
         _open_step(user, "grade", "setup")
         return
 
-    if user.get("awaiting") == "city" and not text.startswith("/"):
-        _city_typed(user, text)
+    if user.get("awaiting") and not text.startswith("/"):
+        _typed(user, text)
         return
 
     if text.startswith("/setting"):
@@ -147,13 +171,15 @@ def handle_callback(callback: dict) -> None:
         user["step"] = data[3:]
         body, keyboard = wizard.render(user["step"], profile, "edit")
 
-    elif data == "tc:input":
-        user["awaiting"] = "city"
-        body, keyboard = wizard.ASK_CITY, wizard.ask_city_keyboard()
+    elif data.startswith("in:"):
+        step = data[3:]
+        user["awaiting"] = step
+        body = wizard.ASK_SALARY if step == "salary" else wizard.ASK_CITIES
+        keyboard = wizard.input_keyboard(step)
 
-    elif data == "tc:cancel":
+    elif data.startswith("ca:"):
         user["awaiting"] = None
-        body, keyboard = wizard.render("cities", profile, user.get("mode", "setup"))
+        body, keyboard = wizard.render(data[3:], profile, user.get("mode", "setup"))
 
     elif data.startswith("bk:"):
         # В режиме правки «Назад» уводит в список настроек, а не на шаг раньше:
@@ -166,11 +192,10 @@ def handle_callback(callback: dict) -> None:
             user["step"] = earlier
             body, keyboard = wizard.render(earlier, profile, "setup")
 
-    elif data.startswith("nx:") or data.startswith("sl:"):
-        # Зарплата — выбор из одного варианта, поэтому после неё сразу дальше,
-        # лишнее нажатие «Дальше» тут ничего не решает.
+    elif data.startswith("nx:") or data.startswith("sk:"):
         wizard.apply(data, user)
-        step = data.split(":")[1] if data.startswith("nx:") else "salary"
+        step = data[3:]
+        user["awaiting"] = None
         if user.get("mode") == "edit":
             user["step"] = None
             body, keyboard = wizard.render_settings(profile)

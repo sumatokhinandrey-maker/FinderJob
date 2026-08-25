@@ -10,21 +10,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from finderjob import geo
+
 ROOT = Path(__file__).resolve().parent.parent
 
 GRADES = [
+    ("intern", "Стажёр"),
     ("junior", "Junior"),
     ("middle", "Middle"),
     ("senior", "Senior"),
     ("lead", "Lead"),
-]
-
-SALARIES = [
-    (50000, "от 50 000"),
-    (100000, "от 100 000"),
-    (150000, "от 150 000"),
-    (200000, "от 200 000"),
-    (250000, "от 250 000"),
 ]
 
 FORMATS = [
@@ -33,17 +28,25 @@ FORMATS = [
     ("office", "Офис"),
 ]
 
-QUICK_CITIES = ["Москва", "Санкт-Петербург"]
+# Корзины мест. Конкретные города человек добавляет сам, списком через запятую.
+PLACES = [
+    ("russia", "Города России"),
+    ("abroad", "За рубежом"),
+]
+
+ANY = "пропущено"
 
 
 def blank() -> dict:
-    """Пустой профиль: пусто везде значит «не важно», а не «ничего не подходит».
-    Так человек, бросивший мастер на середине, всё равно получит дайджест."""
+    """Пустой профиль: пусто везде значит «пропущено», а не «ничего
+    не подходит». Так человек, бросивший мастер на середине, всё равно
+    получит дайджест."""
     return {
         "grades": [],
         "salary_min": None,
+        "salary_max": None,
         "formats": [],
-        "any_city": True,
+        "places": [],
         "cities": [],
     }
 
@@ -55,19 +58,25 @@ def new_user(chat_id: int, username: str | None, today: str) -> dict:
         "created_at": today,
         "step": None,
         "mode": "setup",
+        "awaiting": None,
         "profile": blank(),
         "seen": {},
     }
 
 
 def needs_cities(profile: dict) -> bool:
-    """Про города спрашиваем, только если человек готов куда-то ездить.
-    Пустой список форматов — это «не важно», то есть офис и гибрид тоже
-    подходят, и город снова имеет значение."""
+    """Про место спрашиваем, только если человек готов куда-то ездить.
+    Пустой список форматов — это «пропущено», то есть офис и гибрид тоже
+    подходят, и место снова имеет значение."""
     formats = profile.get("formats") or []
     if not formats:
         return True
     return "hybrid" in formats or "office" in formats
+
+
+def place_set(profile: dict) -> bool:
+    """Задано ли хоть что-то на шаге места."""
+    return bool(profile.get("places") or profile.get("cities"))
 
 
 def to_filters(profile: dict) -> dict:
@@ -75,7 +84,7 @@ def to_filters(profile: dict) -> dict:
     config = json.loads((ROOT / "config.json").read_text("utf-8"))
     role = config.get("role", {})
     formats = profile.get("formats") or []
-    # Пустой список форматов значит «любой», поэтому разрешаем все три.
+    # Пустой список форматов значит «пропущено», поэтому разрешаем все три.
     chosen = {name: (not formats or name in formats) for name, _ in FORMATS}
 
     return {
@@ -83,9 +92,10 @@ def to_filters(profile: dict) -> dict:
         "include_any": role.get("include_any", []),
         "exclude_any": role.get("exclude_any", []),
         "salary_min": profile.get("salary_min"),
+        "salary_max": profile.get("salary_max"),
         "work_formats": {
             **chosen,
-            "any_city": profile.get("any_city", True),
+            "places": profile.get("places") or [],
             "cities": profile.get("cities") or [],
         },
     }
@@ -95,8 +105,6 @@ def to_filters(profile: dict) -> dict:
 # как профиль выглядит словами
 # --------------------------------------------------------------------------
 
-ANY = "не важно"
-
 
 def _named(selected: list, options: list[tuple]) -> str:
     if not selected:
@@ -105,15 +113,23 @@ def _named(selected: list, options: list[tuple]) -> str:
     return ", ".join(labels) if labels else ANY
 
 
+def _money(value: int) -> str:
+    return f"{value:,}".replace(",", " ")
+
+
 def describe_grades(profile: dict) -> str:
     return _named(profile.get("grades") or [], GRADES)
 
 
 def describe_salary(profile: dict) -> str:
-    value = profile.get("salary_min")
-    if not value:
-        return ANY
-    return f"от {value:,} рублей".replace(",", " ")
+    low, high = profile.get("salary_min"), profile.get("salary_max")
+    if low and high:
+        return f"от {_money(low)} до {_money(high)}"
+    if low:
+        return f"от {_money(low)}"
+    if high:
+        return f"до {_money(high)}"
+    return ANY
 
 
 def describe_formats(profile: dict) -> str:
@@ -122,12 +138,9 @@ def describe_formats(profile: dict) -> str:
 
 def describe_cities(profile: dict) -> str:
     if not needs_cities(profile):
-        # Единственный случай, когда города не спрашиваем, — выбрана
-        # только удалёнка.
         return "не спрашиваем, ты выбрал только удалёнку"
-    if profile.get("any_city"):
-        return ANY
-    parts = list(profile.get("cities") or [])
+    parts = [label for value, label in PLACES if value in (profile.get("places") or [])]
+    parts += list(profile.get("cities") or [])
     return ", ".join(parts) if parts else ANY
 
 
@@ -137,5 +150,52 @@ def summary(profile: dict) -> str:
         f"Грейд: {describe_grades(profile)}\n"
         f"Зарплата: {describe_salary(profile)}\n"
         f"Формат работы: {describe_formats(profile)}\n"
-        f"Города: {describe_cities(profile)}"
+        f"Город: {describe_cities(profile)}"
     )
+
+
+# --------------------------------------------------------------------------
+# разбор того, что человек написал руками
+# --------------------------------------------------------------------------
+
+
+def parse_salary(text: str) -> tuple[int | None, int | None] | None:
+    """Вилка из свободного текста: «150000-250000», «от 150 до 250 тысяч»,
+    «150к», «200000». Возвращает (от, до) или None, если чисел не нашлось."""
+    import re
+
+    cleaned = text.lower().replace(" ", " ").replace("—", "-").replace("–", "-")
+    numbers = []
+    for raw, suffix in re.findall(r"(\d[\d\s]*)\s*(к|k|тыс[а-я.]*)?", cleaned):
+        digits = raw.replace(" ", "")
+        if not digits:
+            continue
+        value = int(digits)
+        if suffix or value < 1000:
+            value *= 1000
+        numbers.append(value)
+
+    if not numbers:
+        return None
+    if len(numbers) == 1:
+        # «до 200000» — единственное число, но это потолок, а не порог.
+        if re.search(r"\bдо\b", cleaned) and not re.search(r"\bот\b", cleaned):
+            return None, numbers[0]
+        return numbers[0], None
+    low, high = min(numbers[0], numbers[1]), max(numbers[0], numbers[1])
+    return low, high
+
+
+def parse_cities(text: str) -> list[str]:
+    """Список городов через запятую. Приводим написание к канону справочника,
+    чтобы «питер» и «Санкт-Петербург» не разъезжались."""
+    names = []
+    for chunk in text.replace(";", ",").split(","):
+        name = " ".join(chunk.split()).strip("-—.;:")
+        if not name or len(name) > 40:
+            continue
+        canonical = geo.canon(name)
+        pretty = "-".join(part[:1].upper() + part[1:] for part in canonical.split("-"))
+        if pretty not in names:
+            names.append(pretty)
+    return names[:10]

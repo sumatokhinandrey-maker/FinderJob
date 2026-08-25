@@ -32,7 +32,8 @@ _META_DESC_RE = re.compile(r'<meta name="description" content="([^"]*)"')
 _SITEMAP_RE = re.compile(r"<loc>([^<]+)</loc>\s*<lastmod>([^<]+)</lastmod>")
 
 # Грейд hirehi отдаёт строкой вида "middle level position".
-_GRADE_RE = re.compile(r"\b(junior|middle|senior|lead)\b", re.I)
+# intern и trainee сайт пока не размечает — ловим на будущее.
+_GRADE_RE = re.compile(r"\b(intern|trainee|junior|middle|senior|lead)\b", re.I)
 
 
 def _fetch(url: str, timeout: int = 30) -> str:
@@ -123,6 +124,9 @@ def parse_vacancy(url: str, html: str) -> Vacancy | None:
         return None
 
     grade_match = _GRADE_RE.search(posting.get("qualifications") or "")
+    grade = grade_match.group(1).lower() if grade_match else None
+    if grade == "trainee":
+        grade = "intern"
     work_format, fmt_city = _parse_work_format(html)
     address = posting.get("jobLocation", {}).get("address", {})
     experience = posting.get("experienceRequirements", {})
@@ -134,7 +138,7 @@ def parse_vacancy(url: str, html: str) -> Vacancy | None:
         source="hirehi",
         title=_text(posting.get("title")),
         company=_text(posting.get("hiringOrganization", {}).get("name")),
-        grade=grade_match.group(1).lower() if grade_match else None,
+        grade=grade,
         salary=_parse_salary(posting),
         work_format=work_format,
         city=_text(address.get("addressLocality")) or fmt_city,

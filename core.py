@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass
 from datetime import date, timedelta
 from pathlib import Path
 
+from finderjob import geo
+
 ROOT = Path(__file__).parent
 
 
@@ -51,17 +53,30 @@ REASONS = {
 }
 
 
-def _city_allowed(vacancy: Vacancy, rules: dict) -> bool:
-    """Город подходит? Касается только гибрида и офиса — на удалёнку не влияет."""
-    if rules.get("any_city", True):
+def _place_allowed(vacancy: Vacancy, rules: dict) -> bool:
+    """Место подходит? Касается только гибрида и офиса — на удалёнку не влияет.
+
+    Три источника ответа: корзина «города России», корзина «за рубежом»
+    и список конкретных городов. Пусто везде — шаг пропущен, подходит всё.
+    """
+    places = rules.get("places") or []
+    cities = rules.get("cities") or []
+    if not places and not cities:
         return True
-    city = (vacancy.city or "").strip().lower()
-    # Город не указан вовсе — не угадываем, пропускаем дальше,
-    # решать будет человек.
-    if not city:
+
+    if not vacancy.city:
+        # Город не указан вовсе — не угадываем, решать будет человек.
         return True
-    allowed = [c.lower() for c in rules.get("cities", [])]
-    return any(city == c or c in city for c in allowed)
+
+    if any(geo.same(vacancy.city, name) for name in cities):
+        return True
+
+    where = geo.where(vacancy.city)
+    if where is None:
+        # Незнакомый город: в какой он корзине, мы не знаем, поэтому
+        # не отсекаем. Лучше лишняя строка, чем потерянная вакансия.
+        return True
+    return ("russia" if where == "ru" else "abroad") in places
 
 
 def check(vacancy: Vacancy, profile: dict) -> str | None:
@@ -86,12 +101,18 @@ def check(vacancy: Vacancy, profile: dict) -> str | None:
     if vacancy.work_format in ("hybrid", "office"):
         if not formats.get(vacancy.work_format, True):
             return "format"
-        if not _city_allowed(vacancy, formats):
+        if not _place_allowed(vacancy, formats):
             return "format"
 
-    minimum = profile.get("salary_min")
-    if minimum and vacancy.salary is not None and vacancy.salary < minimum:
-        return "salary"
+    # Вилку указывает примерно каждая десятая вакансия. У остальных
+    # salary is None, и они проходят — иначе отсечётся почти всё.
+    if vacancy.salary is not None:
+        minimum = profile.get("salary_min")
+        maximum = profile.get("salary_max")
+        if minimum and vacancy.salary < minimum:
+            return "salary"
+        if maximum and vacancy.salary > maximum:
+            return "salary"
 
     return None
 
