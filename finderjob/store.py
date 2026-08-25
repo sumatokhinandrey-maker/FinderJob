@@ -14,10 +14,28 @@ import urllib.request
 
 # Upstash через маркетплейс Vercel кладёт переменные под именами KV_*,
 # при ручной установке — под UPSTASH_*. Принимаем оба.
-URL = os.environ.get("KV_REST_API_URL") or os.environ.get("UPSTASH_REDIS_REST_URL")
-TOKEN = os.environ.get("KV_REST_API_TOKEN") or os.environ.get(
-    "UPSTASH_REDIS_REST_TOKEN"
+def _clean_url(value: str | None) -> str | None:
+    """Значение приезжает из секретов гитхаба и переменных Vercel, где легко
+    оставить кавычки или потерять схему при копировании. Чиним молча —
+    падать на этом посреди рассылки незачем."""
+    if not value:
+        return None
+    value = value.strip().strip("\"'").rstrip("/")
+    if not value:
+        return None
+    if not value.startswith(("http://", "https://")):
+        value = "https://" + value
+    return value
+
+
+URL = _clean_url(
+    os.environ.get("KV_REST_API_URL") or os.environ.get("UPSTASH_REDIS_REST_URL")
 )
+TOKEN = (
+    os.environ.get("KV_REST_API_TOKEN")
+    or os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+    or ""
+).strip().strip("\"'")
 
 USERS_KEY = "finderjob:users"
 
@@ -30,6 +48,14 @@ def _command(*args: object) -> object:
     if not URL or not TOKEN:
         raise StoreError(
             "Нет доступа к хранилищу: задай KV_REST_API_URL и KV_REST_API_TOKEN"
+        )
+    if ".upstash.io" not in URL:
+        # Самая частая поломка при настройке — адрес и токен вставлены
+        # не в свои поля. Говорим об этом прямо, не показывая значений.
+        raise StoreError(
+            "KV_REST_API_URL не похож на адрес хранилища: ожидается что-то "
+            "вида https://xxx.upstash.io. Проверь, не перепутаны ли местами "
+            "адрес и токен."
         )
     payload = json.dumps([str(a) for a in args]).encode("utf-8")
     request = urllib.request.Request(
