@@ -149,7 +149,11 @@ def handle_callback(callback: dict) -> None:
 
     elif data == "tc:input":
         user["awaiting"] = "city"
-        body, keyboard = wizard.ASK_CITY, []
+        body, keyboard = wizard.ASK_CITY, wizard.ask_city_keyboard()
+
+    elif data == "tc:cancel":
+        user["awaiting"] = None
+        body, keyboard = wizard.render("cities", profile, user.get("mode", "setup"))
 
     elif data.startswith("bk:"):
         # В режиме правки «Назад» уводит в список настроек, а не на шаг раньше:
