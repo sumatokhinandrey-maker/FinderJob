@@ -28,14 +28,18 @@ def _clean_url(value: str | None) -> str | None:
     return value
 
 
-URL = _clean_url(
-    os.environ.get("KV_REST_API_URL") or os.environ.get("UPSTASH_REDIS_REST_URL")
-)
-TOKEN = (
-    os.environ.get("KV_REST_API_TOKEN")
-    or os.environ.get("UPSTASH_REDIS_REST_TOKEN")
-    or ""
-).strip().strip("\"'")
+def _credentials() -> tuple[str | None, str]:
+    """Читаем доступы в момент обращения, а не при импорте: локально .env
+    подхватывается уже после того, как модуль загружен."""
+    url = _clean_url(
+        os.environ.get("KV_REST_API_URL") or os.environ.get("UPSTASH_REDIS_REST_URL")
+    )
+    token = (
+        os.environ.get("KV_REST_API_TOKEN")
+        or os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+        or ""
+    ).strip().strip("\"'")
+    return url, token
 
 USERS_KEY = "finderjob:users"
 POOL_KEY = "finderjob:pool"
@@ -46,6 +50,7 @@ class StoreError(RuntimeError):
 
 
 def _command(*args: object) -> object:
+    URL, TOKEN = _credentials()
     if not URL or not TOKEN:
         raise StoreError(
             "Нет доступа к хранилищу: задай KV_REST_API_URL и KV_REST_API_TOKEN"

@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT))
 import core  # noqa: E402
 from finderjob import profile as prof  # noqa: E402
 from finderjob import store, tg  # noqa: E402
-from sources import hirehi  # noqa: E402
+from sources import habr, hirehi  # noqa: E402
 
 
 def load_env() -> None:
@@ -103,8 +103,23 @@ def main() -> int:
     since = (date.today() - timedelta(days=days)).isoformat()
 
     print(f"Собираю вакансии с {since}…")
-    vacancies = hirehi.collect(since, limit=args.limit)
-    print(f"Найдено на hirehi: {len(vacancies)}")
+    vacancies = []
+    for name, source in (("hirehi", hirehi), ("habr", habr)):
+        try:
+            found = source.collect(since, limit=args.limit)
+        except Exception as exc:
+            # Упавший источник не должен ронять рассылку целиком:
+            # лучше дайджест по одной площадке, чем молчание.
+            print(f"  ! {name} не отдал вакансии: {exc}")
+            continue
+        print(f"Найдено на {name}: {len(found)}")
+        vacancies += found
+
+    before = len(vacancies)
+    vacancies = core.dedupe(vacancies)
+    if before != len(vacancies):
+        print(f"Склеено дублей между источниками: {before - len(vacancies)}")
+    print(f"Всего вакансий: {len(vacancies)}")
 
     if args.json:
         (ROOT / "last_run.json").write_text(core.to_json(vacancies), "utf-8")

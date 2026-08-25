@@ -135,6 +135,51 @@ def apply_filters(
 # --------------------------------------------------------------------------
 
 
+# --------------------------------------------------------------------------
+# склейка источников
+# --------------------------------------------------------------------------
+
+# Грейд в заголовке пишут по-разному, а вакансия одна и та же.
+_NOISE_RE = re.compile(
+    r"\b(junior|middle|senior|lead|джуниор|мидл|синьор|ведущий|старший|младший)\b",
+    re.I,
+)
+
+
+def _fingerprint(vacancy: Vacancy) -> tuple:
+    """Отпечаток вакансии: компания, роль и город.
+
+    Город в ключе нужен, чтобы не склеить три разные вакансии одного
+    работодателя в Москве, Питере и Краснодаре — это разные места работы,
+    а не дубли.
+    """
+    def flatten(text: str) -> str:
+        text = _NOISE_RE.sub(" ", (text or "").lower().replace("ё", "е"))
+        return re.sub(r"[^a-zа-я0-9]", "", text)
+
+    return flatten(vacancy.company), flatten(vacancy.title), flatten(vacancy.city or "")
+
+
+def dedupe(vacancies: list[Vacancy]) -> list[Vacancy]:
+    """Одна вакансия часто висит сразу на нескольких площадках. Оставляем
+    ту запись, где больше данных — с указанной вилкой полезнее, чем без."""
+    best: dict[tuple, Vacancy] = {}
+    order: list[tuple] = []
+    for vacancy in vacancies:
+        key = _fingerprint(vacancy)
+        current = best.get(key)
+        if current is None:
+            best[key] = vacancy
+            order.append(key)
+            continue
+        richer = (vacancy.salary is not None and current.salary is None) or (
+            vacancy.grade is not None and current.grade is None
+        )
+        if richer:
+            best[key] = vacancy
+    return [best[key] for key in order]
+
+
 def trim_seen(seen: dict, keep_days: int = 90) -> dict:
     """Подчищаем старое, чтобы память пользователя не росла вечно.
     Полгода спустя вакансия всё равно закрыта — показать её повторно не страшно."""
