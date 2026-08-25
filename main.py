@@ -105,6 +105,12 @@ def main() -> int:
         (ROOT / "last_run.json").write_text(core.to_json(vacancies), "utf-8")
         print("Записано в last_run.json")
 
+    if not args.dry_run and vacancies:
+        # Кладём собранное в хранилище: из этого запаса бот показывает
+        # подборку новому подписчику сразу после мастера настройки.
+        store.save_pool(core.to_rows(vacancies), date.today().isoformat())
+        print("Запас вакансий обновлён")
+
     sent = 0
     for user in users:
         try:

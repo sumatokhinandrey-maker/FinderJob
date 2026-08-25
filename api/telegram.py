@@ -17,6 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import core  # noqa: E402
 from finderjob import profile as prof  # noqa: E402
 from finderjob import store, tg, wizard  # noqa: E402
 
@@ -24,6 +25,28 @@ STOPPED = (
     "Отписал. Дайджест больше не придёт, критерии стёр.\n\n"
     "Если передумаешь — /start, настроим заново."
 )
+
+
+def first_digest(user: dict) -> None:
+    """Подборка сразу после мастера — из запаса, собранного последней рассылкой.
+    Показанное отмечаем, чтобы утром эти же вакансии не пришли повторно."""
+    rows, collected_at = store.load_pool()
+    if not rows:
+        tg.send(user["chat_id"], wizard.EMPTY_POOL)
+        return
+
+    vacancies = core.from_rows(rows)
+    passed, rejected = core.apply_filters(vacancies, prof.to_filters(user["profile"]))
+    seen = user.get("seen") or {}
+    fresh = core.only_new(passed, seen)
+
+    tg.send(user["chat_id"], core.build_digest(fresh, rejected, len(vacancies)))
+
+    today = date.today().isoformat()
+    for vacancy in fresh:
+        seen[vacancy.id] = today
+    user["seen"] = seen
+    store.save_user(user)
 
 
 def _user(chat: dict) -> dict:
@@ -49,9 +72,11 @@ def handle_message(message: dict) -> None:
     user = _user(chat)
 
     if text.startswith("/start"):
-        user["step"] = None
+        user["mode"] = "setup"
+        user["step"] = "grade"
         store.save_user(user)
-        tg.send(chat["id"], wizard.START, wizard.start_keyboard())
+        body, keyboard = wizard.render("grade", user["profile"], "setup")
+        tg.send(chat["id"], wizard.START + "\n\n" + body, keyboard)
         return
 
     if text.startswith("/settings"):
@@ -74,6 +99,7 @@ def handle_callback(callback: dict) -> None:
     user = _user(chat)
     profile = user["profile"]
     message_id = message.get("message_id")
+    finished = False
 
     if data == "go":
         user["mode"] = "setup"
@@ -106,6 +132,7 @@ def handle_callback(callback: dict) -> None:
             else:
                 body = prof.summary(profile) + "\n\n" + wizard.DONE
                 keyboard = wizard.done_keyboard()
+                finished = True
 
     else:
         wizard.apply(data, user)
@@ -118,6 +145,9 @@ def handle_callback(callback: dict) -> None:
     else:
         tg.send(chat["id"], body, keyboard)
     tg.answer_callback(callback["id"])
+
+    if finished:
+        first_digest(user)
 
 
 def process(update: dict) -> None:

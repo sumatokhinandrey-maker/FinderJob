@@ -38,6 +38,7 @@ TOKEN = (
 ).strip().strip("\"'")
 
 USERS_KEY = "finderjob:users"
+POOL_KEY = "finderjob:pool"
 
 
 class StoreError(RuntimeError):
@@ -103,6 +104,28 @@ def forget_user(chat_id: int | str) -> None:
     который ушёл, незачем."""
     _command("DEL", _key(chat_id))
     _command("SREM", USERS_KEY, chat_id)
+
+
+def save_pool(rows: list[dict], collected_at: str) -> None:
+    """Последний собранный список вакансий. Нужен, чтобы бот мог показать
+    подборку сразу после мастера: сам он обойти hirehi не успеет —
+    это минуты, а у функции секунды."""
+    _command(
+        "SET",
+        POOL_KEY,
+        json.dumps({"collected_at": collected_at, "rows": rows}, ensure_ascii=False),
+    )
+
+
+def load_pool() -> tuple[list[dict], str | None]:
+    raw = _command("GET", POOL_KEY)
+    if not raw:
+        return [], None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return [], None
+    return data.get("rows") or [], data.get("collected_at")
 
 
 def all_users() -> list[dict]:

@@ -209,5 +209,24 @@ def to_plain(digest: str) -> str:
     return unescape(_TAG_RE.sub("", digest))
 
 
+# Описание вакансии режем: по нему ищутся ключевые и стоп-слова, но целиком
+# оно весит килобайты, а в хранилище летит одним HTTP-запросом на весь список.
+DESCRIPTION_LIMIT = 1200
+
+
+def to_rows(vacancies: list[Vacancy]) -> list[dict]:
+    rows = []
+    for vacancy in vacancies:
+        row = asdict(vacancy)
+        row["description"] = row["description"][:DESCRIPTION_LIMIT]
+        rows.append(row)
+    return rows
+
+
+def from_rows(rows: list[dict]) -> list[Vacancy]:
+    fields = {f for f in Vacancy.__dataclass_fields__}
+    return [Vacancy(**{k: v for k, v in row.items() if k in fields}) for row in rows]
+
+
 def to_json(vacancies: list[Vacancy]) -> str:
     return json.dumps([asdict(v) for v in vacancies], ensure_ascii=False, indent=2)

@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/telegram.py": {
-      "includeFiles": "{finderjob/**,config.json}",
+      "includeFiles": "{finderjob/**,core.py,config.json}",
       "maxDuration": 30
     }
   }
