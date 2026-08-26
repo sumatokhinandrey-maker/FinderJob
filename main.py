@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT))
 
 import core  # noqa: E402
 from finderjob import profile as prof  # noqa: E402
-from finderjob import store, tg  # noqa: E402
+from finderjob import stats, store, tg  # noqa: E402
 from sources import careerspace, habr, hirehi  # noqa: E402
 
 
@@ -71,6 +71,8 @@ def deliver(user: dict, vacancies: list, dry_run: bool) -> int:
         return len(fresh)
 
     tg.send(user["chat_id"], digest)
+    stats.track("digest_sent")
+    stats.track("vacancies_sent", len(fresh))
 
     today = date.today().isoformat()
     for vacancy in fresh:
@@ -88,9 +90,14 @@ def main() -> int:
     parser.add_argument("--limit", type=int, help="ограничить число страниц")
     parser.add_argument("--days", type=int, help="за сколько дней смотреть")
     parser.add_argument("--json", action="store_true", help="выгрузить сбор в JSON")
+    parser.add_argument("--stats", action="store_true", help="показать аналитику и выйти")
     args = parser.parse_args()
 
     load_env()
+
+    if args.stats:
+        print(core.to_plain(stats.report(days=14)))
+        return 0
 
     users = store.all_users()
     print(f"Подписчиков: {len(users)}")

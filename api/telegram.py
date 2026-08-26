@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import core  # noqa: E402
 from finderjob import profile as prof  # noqa: E402
-from finderjob import store, tg, wizard  # noqa: E402
+from finderjob import stats, store, tg, wizard  # noqa: E402
 
 STOPPED = (
     "Отписал. Дайджест больше не придёт, критерии стёр.\n\n"
@@ -41,6 +41,8 @@ def first_digest(user: dict) -> None:
     fresh = core.only_new(passed, seen)
 
     tg.send(user["chat_id"], core.build_digest(fresh))
+    stats.track("digest_sent")
+    stats.track("vacancies_sent", len(fresh))
 
     today = date.today().isoformat()
     for vacancy in fresh:
@@ -74,6 +76,7 @@ def _typed(user: dict, text: str) -> None:
         profile["salary_min"], profile["salary_max"] = parsed
         note = f"Записал: {prof.describe_salary(profile)}"
     else:
+        stats.track("city_typed")
         names = prof.parse_cities(text)
         if not names:
             _show(user, wizard.BAD_CITIES, wizard.input_keyboard("cities"))
@@ -117,6 +120,7 @@ def handle_message(message: dict) -> None:
 
     if text.startswith("/stop"):
         store.forget_user(chat["id"])
+        stats.track("stop")
         tg.send(chat["id"], STOPPED)
         return
 
@@ -127,6 +131,7 @@ def handle_message(message: dict) -> None:
         # галочки с прошлого прохода и принимает их за выбор по умолчанию.
         # Память о показанных вакансиях при этом не трогаем.
         user["profile"] = prof.blank()
+        stats.track("start")
         _open_step(user, "grade", "setup")
         return
 
@@ -134,7 +139,12 @@ def handle_message(message: dict) -> None:
         _typed(user, text)
         return
 
+    if text.startswith("/stats") and str(chat["id"]) == os.environ.get("ADMIN_CHAT_ID"):
+        tg.send(chat["id"], stats.report())
+        return
+
     if text.startswith("/setting"):
+        stats.track("settings")
         user["awaiting"] = None
         user["mode"] = "edit"
         user["step"] = None
@@ -214,6 +224,7 @@ def handle_callback(callback: dict) -> None:
                 body = prof.summary(profile) + "\n\n" + wizard.DONE
                 keyboard = wizard.done_keyboard()
                 finished = True
+                stats.track("wizard_done")
 
     else:
         wizard.apply(data, user)
