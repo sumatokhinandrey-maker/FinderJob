@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from html import unescape
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -170,24 +170,47 @@ def _fingerprint(vacancy: Vacancy) -> tuple:
     return flatten(vacancy.company), flatten(vacancy.title), flatten(vacancy.city or "")
 
 
+# Куда человек может откликнуться сразу, а где упрётся в стену. На hirehi
+# отклик закрыт регистрацией и лимитом ради подписки, поэтому при равных
+# данных ведём на другую площадку.
+OPENNESS = {"habr": 0, "careerspace": 0, "hirehi": 1}
+
+
+def _richness(vacancy: Vacancy) -> int:
+    return sum(
+        1
+        for field in (vacancy.salary, vacancy.grade, vacancy.city)
+        if field is not None
+    ) + (1 if vacancy.work_format != "unknown" else 0)
+
+
 def dedupe(vacancies: list[Vacancy]) -> list[Vacancy]:
-    """Одна вакансия часто висит сразу на нескольких площадках. Оставляем
-    ту запись, где больше данных — с указанной вилкой полезнее, чем без."""
-    best: dict[tuple, Vacancy] = {}
+    """Одна вакансия часто висит сразу на нескольких площадках.
+
+    Берём данные оттуда, где их больше, а ссылку — оттуда, откуда человек
+    сможет откликнуться. Это разные площадки чаще, чем кажется: hirehi
+    подробнее всех, но прячет отклик за регистрацией.
+    """
+    groups: dict[tuple, list[Vacancy]] = {}
     order: list[tuple] = []
     for vacancy in vacancies:
         key = _fingerprint(vacancy)
-        current = best.get(key)
-        if current is None:
-            best[key] = vacancy
+        if key not in groups:
+            groups[key] = []
             order.append(key)
-            continue
-        richer = (vacancy.salary is not None and current.salary is None) or (
-            vacancy.grade is not None and current.grade is None
-        )
-        if richer:
-            best[key] = vacancy
-    return [best[key] for key in order]
+        groups[key].append(vacancy)
+
+    merged = []
+    for key in order:
+        items = groups[key]
+        best = max(items, key=_richness)
+        if len(items) > 1:
+            reachable = min(items, key=lambda v: OPENNESS.get(v.source, 1))
+            if OPENNESS.get(reachable.source, 1) < OPENNESS.get(best.source, 1):
+                # Данные оставляем, ссылку и источник берём у открытой площадки.
+                best = replace(best, url=reachable.url, source=reachable.source)
+        merged.append(best)
+    return merged
 
 
 def trim_seen(seen: dict, keep_days: int = 90) -> dict:
