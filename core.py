@@ -83,9 +83,12 @@ def check(vacancy: Vacancy, profile: dict) -> str | None:
     """None — вакансия подходит. Иначе код причины отсева."""
     text = vacancy.haystack()
 
+    # У geekjob вакансия может быть сразу на несколько грейдов
+    # («Миддл • Сеньор»), поэтому храним их через запятую и сверяем пересечение.
     grades = profile.get("grades") or []
-    if grades and vacancy.grade and vacancy.grade not in grades:
-        return "grade"
+    if grades and vacancy.grade:
+        if not set(vacancy.grade.split(",")) & set(grades):
+            return "grade"
 
     include = [w.lower() for w in profile.get("include_any", [])]
     if include and not any(word in text for word in include):
@@ -223,7 +226,7 @@ def _line(vacancy: Vacancy) -> str:
     if vacancy.salary:
         facts.append(f"от {vacancy.salary:,} ₽".replace(",", " "))
     if vacancy.grade:
-        facts.append(vacancy.grade)
+        facts.append(vacancy.grade.replace(",", ", "))
 
     return (
         f"▸ <b>{_escape(vacancy.title)}</b>\n"
