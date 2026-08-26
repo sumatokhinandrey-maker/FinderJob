@@ -242,15 +242,22 @@ MONTHS = (
 
 # Как подписываем источник в ссылке. Длинный адрес в дайджесте занимает
 # строку и ничего не сообщает — короткая подпись говорит то же самое.
+# Подпись ссылки — имя площадки, куда человек попадёт.
 SOURCE_LABEL = {
     "hirehi": "hirehi",
     "habr": "habr",
     "careerspace": "careerspace",
     "hh": "hh.ru",
+    "yandex": "Yandex",
+    "vk": "VK",
+    "tbank": "Т-Банк",
+    "mts": "МТС",
+    "magnit": "Магнит",
+    "rwb": "RWB",
 }
 
-# Карьерные сайты подписываем не доменом, а тем, что это значит для человека:
-# отклик идёт напрямую работодателю, без посредников и регистраций.
+# Карьерные сайты компаний: отклик идёт напрямую работодателю, без посредников
+# и регистраций, поэтому при склейке дублей они выигрывают у всех.
 COMPANY_SITES = {"yandex", "magnit", "mts", "tbank", "rwb", "vk"}
 
 FORMAT_LABEL = {
@@ -278,9 +285,7 @@ def _line(vacancy: Vacancy) -> str:
     if vacancy.grade:
         facts.append(vacancy.grade.replace(",", ", "))
 
-    label = SOURCE_LABEL.get(vacancy.source) or (
-        "сайт компании" if vacancy.source in COMPANY_SITES else vacancy.source
-    )
+    label = SOURCE_LABEL.get(vacancy.source, vacancy.source)
     link = f'<a href="{_escape(vacancy.url)}">{label} ↗</a>'
     line = _escape(" · ".join(f for f in facts if f))
     return f"▸ <b>{_escape(vacancy.title)}</b>\n   {line} · {link}"
