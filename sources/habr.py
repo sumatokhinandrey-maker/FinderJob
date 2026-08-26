@@ -58,10 +58,22 @@ GRADES = {
 }
 
 
-def _fetch(url: str, timeout: int = 30) -> str:
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("utf-8", "replace")
+def _fetch(url: str, timeout: int = 30, tries: int = 3) -> str:
+    """Хабр время от времени роняет SSL-рукопожатие. Одна неудача не повод
+    терять источник целиком, поэтому пробуем несколько раз."""
+    last: Exception | None = None
+    for attempt in range(tries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError:
+            raise
+        except Exception as exc:
+            last = exc
+            if attempt < tries - 1:
+                time.sleep(1.5 * (attempt + 1))
+    raise last if last else RuntimeError(f"не удалось получить {url}")
 
 
 def list_recent(since: str) -> list[str]:
