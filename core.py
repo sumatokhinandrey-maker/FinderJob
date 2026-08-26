@@ -233,6 +233,15 @@ MONTHS = (
     " августа сентября октября ноября декабря"
 ).split()
 
+# Как подписываем источник в ссылке. Длинный адрес в дайджесте занимает
+# строку и ничего не сообщает — короткая подпись говорит то же самое.
+SOURCE_LABEL = {
+    "hirehi": "hirehi",
+    "habr": "habr",
+    "careerspace": "careerspace",
+    "hh": "hh.ru",
+}
+
 FORMAT_LABEL = {
     "remote": "удалёнка",
     "hybrid": "гибрид",
@@ -258,11 +267,10 @@ def _line(vacancy: Vacancy) -> str:
     if vacancy.grade:
         facts.append(vacancy.grade.replace(",", ", "))
 
-    return (
-        f"▸ <b>{_escape(vacancy.title)}</b>\n"
-        f"   {_escape(' · '.join(f for f in facts if f))}\n"
-        f"   {vacancy.url}"
-    )
+    label = SOURCE_LABEL.get(vacancy.source, vacancy.source)
+    link = f'<a href="{_escape(vacancy.url)}">{label} ↗</a>'
+    line = _escape(" · ".join(f for f in facts if f))
+    return f"▸ <b>{_escape(vacancy.title)}</b>\n   {line} · {link}"
 
 
 def build_digest(vacancies: list[Vacancy]) -> str:
@@ -284,7 +292,7 @@ def _plural(n: int) -> str:
     return "новых"
 
 
-_TAG_RE = re.compile(r"</?[a-z]+>")
+_TAG_RE = re.compile(r"</?[a-z]+(?:\s[^>]*)?>")
 
 
 def to_plain(digest: str) -> str:
