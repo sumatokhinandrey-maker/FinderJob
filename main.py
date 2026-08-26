@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT))
 import core  # noqa: E402
 from finderjob import profile as prof  # noqa: E402
 from finderjob import stats, store, tg  # noqa: E402
-from sources import careerspace, habr, hirehi  # noqa: E402
+from sources import careerspace, habr, hh, hirehi  # noqa: E402
 
 
 def load_env() -> None:
@@ -112,7 +112,7 @@ def main() -> int:
     print(f"Собираю вакансии с {since}…")
     vacancies = []
     for name, source in (("hirehi", hirehi), ("habr", habr),
-                         ("careerspace", careerspace)):
+                         ("careerspace", careerspace), ("hh", hh)):
         try:
             found = source.collect(since, limit=args.limit)
         except Exception as exc:
