@@ -149,6 +149,11 @@ _NOISE_RE = re.compile(
 )
 
 
+# UX/UI и UI/UX — одно и то же, но для машины разные строки. Пока не свели
+# к общему виду, дубли между источниками не склеивались вовсе.
+_UXUI_RE = re.compile(r"\bu[ix]\s*[/\-]?\s*u[ix]\b", re.I)
+
+
 def _fingerprint(vacancy: Vacancy) -> tuple:
     """Отпечаток вакансии: компания, роль и город.
 
@@ -157,7 +162,9 @@ def _fingerprint(vacancy: Vacancy) -> tuple:
     а не дубли.
     """
     def flatten(text: str) -> str:
-        text = _NOISE_RE.sub(" ", (text or "").lower().replace("ё", "е"))
+        text = (text or "").lower().replace("ё", "е")
+        text = _UXUI_RE.sub(" uxui ", text)
+        text = _NOISE_RE.sub(" ", text)
         return re.sub(r"[^a-zа-я0-9]", "", text)
 
     return flatten(vacancy.company), flatten(vacancy.title), flatten(vacancy.city or "")
