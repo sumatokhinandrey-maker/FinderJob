@@ -173,7 +173,14 @@ def _fingerprint(vacancy: Vacancy) -> tuple:
 # Куда человек может откликнуться сразу, а где упрётся в стену. На hirehi
 # отклик закрыт регистрацией и лимитом ради подписки, поэтому при равных
 # данных ведём на другую площадку.
-OPENNESS = {"habr": 0, "careerspace": 0, "hirehi": 1}
+OPENNESS = {
+    # Сайт самой компании — лучшее, куда можно привести: отклик напрямую.
+    **{key: 0 for key in ("yandex", "magnit", "mts", "tbank", "rwb", "vk")},
+    "hh": 1,
+    "habr": 1,
+    "careerspace": 1,
+    "hirehi": 2,
+}
 
 
 def _richness(vacancy: Vacancy) -> int:
@@ -242,6 +249,10 @@ SOURCE_LABEL = {
     "hh": "hh.ru",
 }
 
+# Карьерные сайты подписываем не доменом, а тем, что это значит для человека:
+# отклик идёт напрямую работодателю, без посредников и регистраций.
+COMPANY_SITES = {"yandex", "magnit", "mts", "tbank", "rwb", "vk"}
+
 FORMAT_LABEL = {
     "remote": "удалёнка",
     "hybrid": "гибрид",
@@ -267,7 +278,9 @@ def _line(vacancy: Vacancy) -> str:
     if vacancy.grade:
         facts.append(vacancy.grade.replace(",", ", "))
 
-    label = SOURCE_LABEL.get(vacancy.source, vacancy.source)
+    label = SOURCE_LABEL.get(vacancy.source) or (
+        "сайт компании" if vacancy.source in COMPANY_SITES else vacancy.source
+    )
     link = f'<a href="{_escape(vacancy.url)}">{label} ↗</a>'
     line = _escape(" · ".join(f for f in facts if f))
     return f"▸ <b>{_escape(vacancy.title)}</b>\n   {line} · {link}"
