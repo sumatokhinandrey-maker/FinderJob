@@ -168,33 +168,6 @@ def summary(profile: dict) -> str:
 # --------------------------------------------------------------------------
 
 
-def parse_salary(text: str) -> tuple[int | None, int | None] | None:
-    """Вилка из свободного текста: «150000-250000», «от 150 до 250 тысяч»,
-    «150к», «200000». Возвращает (от, до) или None, если чисел не нашлось."""
-    import re
-
-    cleaned = text.lower().replace(" ", " ").replace("—", "-").replace("–", "-")
-    numbers = []
-    for raw, suffix in re.findall(r"(\d[\d\s]*)\s*(к|k|тыс[а-я.]*)?", cleaned):
-        digits = raw.replace(" ", "")
-        if not digits:
-            continue
-        value = int(digits)
-        if suffix or value < 1000:
-            value *= 1000
-        numbers.append(value)
-
-    if not numbers:
-        return None
-    if len(numbers) == 1:
-        # «до 200000» — единственное число, но это потолок, а не порог.
-        if re.search(r"\bдо\b", cleaned) and not re.search(r"\bот\b", cleaned):
-            return None, numbers[0]
-        return numbers[0], None
-    low, high = min(numbers[0], numbers[1]), max(numbers[0], numbers[1])
-    return low, high
-
-
 def parse_cities(text: str) -> list[str]:
     """Список городов через запятую. Приводим написание к канону справочника,
     чтобы «питер» и «Санкт-Петербург» не разъезжались."""

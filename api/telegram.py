@@ -35,7 +35,7 @@ def first_digest(user: dict) -> None:
         tg.send(user["chat_id"], wizard.EMPTY_POOL)
         return
 
-    vacancies = core.from_rows(rows)
+    vacancies = core.fill_grades(core.from_rows(rows))
     passed, _ = core.apply_filters(vacancies, prof.to_filters(user["profile"]))
     seen = user.get("seen") or {}
     fresh = core.only_new(passed, seen)
@@ -68,24 +68,25 @@ def _typed(user: dict, text: str) -> None:
     profile = user["profile"]
     note = ""
 
-    if step == "salary":
-        parsed = prof.parse_salary(text)
-        if parsed is None:
-            _show(user, wizard.BAD_SALARY, wizard.input_keyboard("salary"))
-            return
-        profile["salary_min"], profile["salary_max"] = parsed
-        note = f"Записал: {prof.describe_salary(profile)}"
-    else:
-        stats.track("city_typed")
-        names = prof.parse_cities(text)
-        if not names:
-            _show(user, wizard.BAD_CITIES, wizard.input_keyboard("cities"))
-            return
-        cities = profile.setdefault("cities", [])
-        for name in names:
-            if name not in cities:
-                cities.append(name)
-        note = "Записал: " + ", ".join(names)
+    if step != "cities":
+        # Зарплату когда-то вводили текстом, теперь она выбирается кнопками.
+        # Кто-то мог застать старый шаг открытым — возвращаем его на карточку.
+        user["awaiting"] = None
+        store.save_user(user)
+        body, keyboard = wizard.render(step, profile, user.get("mode", "setup"))
+        _show(user, body, keyboard)
+        return
+
+    stats.track("city_typed")
+    names = prof.parse_cities(text)
+    if not names:
+        _show(user, wizard.BAD_CITIES, wizard.input_keyboard("cities"))
+        return
+    cities = profile.setdefault("cities", [])
+    for name in names:
+        if name not in cities:
+            cities.append(name)
+    note = "Записал: " + ", ".join(names)
 
     user["awaiting"] = None
     store.save_user(user)
@@ -169,6 +170,7 @@ def handle_callback(callback: dict) -> None:
     profile = user["profile"]
     message_id = message.get("message_id")
     finished = False
+    edited = False
 
     if data == "go":
         # «Задать заново» из настроек — тоже с чистого листа.
@@ -190,7 +192,7 @@ def handle_callback(callback: dict) -> None:
     elif data.startswith("in:"):
         step = data[3:]
         user["awaiting"] = step
-        body = wizard.ASK_SALARY if step == "salary" else wizard.ASK_CITIES
+        body = wizard.ASK_CITIES
         keyboard = wizard.input_keyboard(step)
 
     elif data.startswith("ca:"):
@@ -214,6 +216,7 @@ def handle_callback(callback: dict) -> None:
         user["awaiting"] = None
         if user.get("mode") == "edit":
             user["step"] = None
+            edited = True
             body, keyboard = wizard.render_settings(profile)
         else:
             following = wizard.next_step(step, profile)
@@ -241,6 +244,11 @@ def handle_callback(callback: dict) -> None:
     tg.answer_callback(callback["id"])
 
     if finished:
+        first_digest(user)
+    elif edited:
+        # Правка критерия молча — это правка вслепую: человек не знает,
+        # что она дала. Показываем подборку по новым критериям сразу,
+        # из того же запаса, что и после мастера.
         first_digest(user)
 
 

@@ -126,22 +126,31 @@ def main() -> int:
     days = args.days or config.get("lookback_days", 2)
     since = (date.today() - timedelta(days=days)).isoformat()
 
+    # Медленным доскам своё окно: designer.ru публикует единицы в неделю,
+    # и на общих двух сутках оттуда приходит одна вакансия или ни одной.
+    # Повторов это не создаёт — их отсекает память о показанном.
+    windows = config.get("lookback_days_by_source") or {}
+
     print(f"Собираю вакансии с {since}…")
     vacancies = []
-    for name, source in (("hirehi", hirehi), ("habr", habr),
-                         ("careerspace", careerspace), ("hh", hh),
-                         ("getmatch", getmatch), ("designer.ru", designer),
-                         ("карьерные сайты", companies)):
+    for name, key, source in (("hirehi", "hirehi", hirehi), ("habr", "habr", habr),
+                              ("careerspace", "careerspace", careerspace),
+                              ("hh", "hh", hh), ("getmatch", "getmatch", getmatch),
+                              ("designer.ru", "designer", designer),
+                              ("карьерные сайты", "companies", companies)):
+        own = windows.get(key)
+        start = (date.today() - timedelta(days=own)).isoformat() if own else since
         try:
-            found = source.collect(since, limit=args.limit)
+            found = source.collect(start, limit=args.limit)
         except Exception as exc:
             # Упавший источник не должен ронять рассылку целиком:
             # лучше дайджест по одной площадке, чем молчание.
             print(f"  ! {name} не отдал вакансии: {exc}")
             continue
-        print(f"Найдено на {name}: {len(found)}")
+        print(f"Найдено на {name}: {len(found)}" + (f" (окно {own} дней)" if own else ""))
         vacancies += found
 
+    vacancies = core.fill_grades(vacancies)
     before = len(vacancies)
     vacancies = core.dedupe(vacancies)
     if before != len(vacancies):

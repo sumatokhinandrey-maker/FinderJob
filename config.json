@@ -26,5 +26,10 @@
       "упаковк",
       "брендинг"
     ]
+  },
+  "lookback_days_by_source": {
+    "designer": 21,
+    "careerspace": 14,
+    "getmatch": 14
   }
 }

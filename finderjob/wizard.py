@@ -26,14 +26,14 @@ COMMANDS = [
 
 DONE = (
     "Критерии сохранены. Дальше дайджест будет приходить сам, "
-    "каждый день в 7 утра по Москве.\n\n"
+    "каждый день в 9 утра по Москве.\n\n"
     "Поменять критерии — /settings."
 )
 
 EMPTY_POOL = (
     "Критерии сохранены.\n\n"
     "Свежих вакансий пока нет под рукой — первая подборка придёт "
-    "завтра в 7 утра по Москве."
+    "завтра в 9 утра по Москве."
 )
 
 HELP = (
@@ -41,26 +41,29 @@ HELP = (
     "/start — начать заново\n"
     "/settings — посмотреть и поменять критерии\n"
     "/stop — отписаться от дайджеста\n\n"
-    "Вакансии беру с hirehi.ru. Роль фиксированная — продуктовый, UX/UI "
-    "и веб-дизайн; графику, моушн и 3D отсекаю."
+    "Вакансии беру с hirehi, hh.ru, Хабр Карьеры, getmatch, careerspace, "
+    "designer.ru и карьерных сайтов компаний. Роль фиксированная — "
+    "продуктовый, UX/UI и веб-дизайн; графику, моушн и 3D отсекаю."
 )
 
-ASK_SALARY = (
-    "<b>Шаг 2 из 4. Зарплата</b>\n\n"
-    "Напиши вилку одним сообщением. Например от 50 - 150 тысяч"
-)
+# Пороги зарплаты. Нижняя граница, а не вилка: верхняя отсекала бы и тех,
+# кто платит больше потолка, — на этом уже обжигались.
+SALARY_STEPS = [100_000, 150_000, 200_000, 250_000]
 
 ASK_CITIES = (
     "<b>Шаг 4 из 4. Город</b>\n\n"
     "Напиши город или несколько через запятую. Например: Москва, Казань."
 )
 
-BAD_SALARY = "Не нашёл в этом чисел. Напиши вилку цифрами, например от 50 - 150 тысяч"
 BAD_CITIES = "Не разобрал ни одного города. Напиши названия через запятую."
 
 QUESTIONS = {
     "grade": "<b>Шаг 1 из 4. Грейд</b>",
-    "salary": "<b>Шаг 2 из 4. Зарплата</b>",
+    "salary": (
+        "<b>Шаг 2 из 4. Зарплата</b>\n\n"
+        "Нижняя граница. Вакансии без указанной вилки не отсекаю — "
+        "их большинство."
+    ),
     "format": "<b>Шаг 3 из 4. Формат работы</b>",
     "cities": (
         "<b>Шаг 4 из 4. Город</b>\n\n"
@@ -118,7 +121,7 @@ def _tail(step: str, profile: dict, mode: str) -> list[list[dict]]:
     if mode == "edit" or prev_step(step, profile):
         nav.append(_button("Назад", f"bk:{step}"))
     if prof.step_filled(profile, step):
-        nav.append(_button("Сохранить" if mode == "edit" else "Далее", f"nx:{step}"))
+        nav.append(_button("Сохранить" if mode == "edit" else "Продолжить", f"nx:{step}"))
 
     rows = [[_button("Неважно", f"sk:{step}")]]
     if nav:
@@ -136,9 +139,15 @@ def keyboard(step: str, profile: dict, mode: str) -> list[list[dict]]:
         return _rows(buttons) + _tail(step, profile, mode)
 
     if step == "salary":
-        current = prof.describe_salary(profile)
-        label = "Значение от — до" if current == prof.ANY else f"{CHECK}{current}"
-        return [[_button(label, "in:salary")]] + _tail(step, profile, mode)
+        current = profile.get("salary_min")
+        buttons = [
+            _button(
+                f"{CHECK if current == value else ''}от {value // 1000} 000",
+                f"ts:{value}",
+            )
+            for value in SALARY_STEPS
+        ]
+        return _rows(buttons) + _tail(step, profile, mode)
 
     if step == "format":
         chosen = profile.get("formats") or []
@@ -170,7 +179,7 @@ def settings_keyboard() -> list[list[dict]]:
     return [
         [_button("Грейд", "ed:grade"), _button("Зарплата", "ed:salary")],
         [_button("Формат работы", "ed:format"), _button("Город", "ed:cities")],
-        [_button("Задать заново", "go")],
+        [_button("Сбросить все фильтры", "go")],
     ]
 
 
@@ -228,5 +237,11 @@ def apply(data: str, user: dict) -> None:
         _toggle(profile.setdefault("places", []), data[3:])
     elif data.startswith("tc:"):
         _toggle(profile.setdefault("cities", []), data[3:])
+    elif data.startswith("ts:"):
+        # Повторное нажатие снимает порог: иначе выбранное не отменить,
+        # не сбрасывая шаг целиком.
+        value = int(data[3:])
+        profile["salary_min"] = None if profile.get("salary_min") == value else value
+        profile["salary_max"] = None
     elif data.startswith("sk:"):
         skip(data[3:], profile)
