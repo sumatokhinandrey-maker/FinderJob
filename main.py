@@ -28,7 +28,8 @@ sys.path.insert(0, str(ROOT))
 import core  # noqa: E402
 from finderjob import profile as prof  # noqa: E402
 from finderjob import stats, store, tg  # noqa: E402
-from sources import careerspace, companies, habr, hh, hirehi  # noqa: E402
+from sources import (careerspace, companies, designer, getmatch,  # noqa: E402
+                     habr, hh, hirehi)
 
 
 def load_env() -> None:
@@ -129,6 +130,7 @@ def main() -> int:
     vacancies = []
     for name, source in (("hirehi", hirehi), ("habr", habr),
                          ("careerspace", careerspace), ("hh", hh),
+                         ("getmatch", getmatch), ("designer.ru", designer),
                          ("карьерные сайты", companies)):
         try:
             found = source.collect(since, limit=args.limit)

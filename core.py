@@ -179,6 +179,8 @@ OPENNESS = {
     "hh": 1,
     "habr": 1,
     "careerspace": 1,
+    "getmatch": 1,
+    "designer": 1,
     "hirehi": 2,
 }
 
@@ -248,6 +250,8 @@ SOURCE_LABEL = {
     "habr": "habr",
     "careerspace": "careerspace",
     "hh": "hh.ru",
+    "getmatch": "getmatch",
+    "designer": "designer.ru",
     "yandex": "Yandex",
     "vk": "VK",
     "tbank": "Т-Банк",
