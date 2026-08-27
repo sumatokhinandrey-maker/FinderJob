@@ -91,6 +91,11 @@ def main() -> int:
     parser.add_argument("--days", type=int, help="за сколько дней смотреть")
     parser.add_argument("--json", action="store_true", help="выгрузить сбор в JSON")
     parser.add_argument("--stats", action="store_true", help="показать аналитику и выйти")
+    parser.add_argument(
+        "--once-a-day",
+        action="store_true",
+        help="выйти, если сегодняшняя рассылка уже состоялась (для догоняющих запусков)",
+    )
     args = parser.parse_args()
 
     load_env()
@@ -98,6 +103,17 @@ def main() -> int:
     if args.stats:
         print(core.to_plain(stats.report(days=14)))
         return 0
+
+    today = date.today().isoformat()
+    if args.once_a_day:
+        # Расписание GitHub — обещание, а не гарантия: запуск могут задержать
+        # на часы или пропустить совсем. Поэтому в течение дня будят ещё
+        # несколько раз, и каждый следующий проверяет, не ушла ли рассылка.
+        done = store.last_sent()
+        if done == today:
+            print(f"Рассылка за {today} уже состоялась — выхожу.")
+            return 0
+        print(f"Рассылки за {today} ещё не было (последняя: {done or 'не помню'}).")
 
     users = store.all_users()
     print(f"Подписчиков: {len(users)}")
@@ -134,7 +150,15 @@ def main() -> int:
         (ROOT / "last_run.json").write_text(core.to_json(vacancies), "utf-8")
         print("Записано в last_run.json")
 
-    if not args.dry_run and vacancies:
+    if not vacancies:
+        # Пустой сбор — это не «сегодня ничего не публиковали», а поломка:
+        # даже в выходные площадки дают десятки вакансий. Молчим и выходим
+        # с ошибкой, чтобы запуск загорелся красным, а догоняющий попробовал
+        # снова: разослать «ничего нового» было бы враньём.
+        print("Ни один источник не отдал вакансий — рассылку не делаю.")
+        return 1
+
+    if not args.dry_run:
         # Кладём собранное в хранилище: из этого запаса бот показывает
         # подборку новому подписчику сразу после мастера настройки.
         store.save_pool(core.to_rows(vacancies), date.today().isoformat())
@@ -148,6 +172,11 @@ def main() -> int:
             # Один упавший подписчик не должен ронять рассылку остальным.
             # Чаще всего это «bot was blocked by the user».
             print(f"  ! не доставлено {user.get('chat_id')}: {exc}")
+
+    if not args.dry_run:
+        # Отметку ставим только после того, как круг подписчиков пройден:
+        # упади мы раньше, догоняющий запуск должен взяться за дело.
+        store.mark_sent(today)
 
     print(f"\nВсего отправлено вакансий: {sent}")
     if args.dry_run:

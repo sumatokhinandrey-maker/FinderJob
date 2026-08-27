@@ -43,6 +43,7 @@ def _credentials() -> tuple[str | None, str]:
 
 USERS_KEY = "finderjob:users"
 POOL_KEY = "finderjob:pool"
+SENT_KEY = "finderjob:sent"
 
 
 class StoreError(RuntimeError):
@@ -131,6 +132,18 @@ def load_pool() -> tuple[list[dict], str | None]:
     except json.JSONDecodeError:
         return [], None
     return data.get("rows") or [], data.get("collected_at")
+
+
+def mark_sent(day: str) -> None:
+    """Отметка «за этот день рассылка состоялась». По ней догоняющие запуски
+    понимают, что делать нечего, и выходят молча."""
+    _command("SET", SENT_KEY, day)
+
+
+def last_sent() -> str | None:
+    """Дата последней состоявшейся рассылки (YYYY-MM-DD) или None."""
+    value = _command("GET", SENT_KEY)
+    return str(value) if value else None
 
 
 def all_users() -> list[dict]:
