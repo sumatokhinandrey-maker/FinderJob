@@ -86,11 +86,17 @@ def fill_grades(vacancies: list[Vacancy]) -> list[Vacancy]:
 # остаются в логах рассылки, чтобы было видно, как работают фильтры.
 REASONS = {
     "grade": "грейд",
+    "grade_unknown": "грейд не указан",
     "role": "не та роль",
     "stop": "стоп-слово",
     "format": "формат работы",
     "salary": "деньги",
 }
+
+
+# Грейды «входа в профессию»: для них действует обратное правило про
+# неизвестный грейд — см. check().
+ENTRY_GRADES = {"intern", "junior"}
 
 
 def _place_allowed(vacancy: Vacancy, rules: dict) -> bool:
@@ -126,9 +132,10 @@ def check(vacancy: Vacancy, profile: dict) -> str | None:
     # У geekjob вакансия может быть сразу на несколько грейдов
     # («Миддл • Сеньор»), поэтому храним их через запятую и сверяем пересечение.
     grades = profile.get("grades") or []
-    if grades and vacancy.grade:
-        if not set(vacancy.grade.split(",")) & set(grades):
-            return "grade"
+    if grades:
+        if vacancy.grade:
+            if not set(vacancy.grade.split(",")) & set(grades):
+                return "grade"
 
     include = [w.lower() for w in profile.get("include_any", [])]
     if include and not any(word in text for word in include):
@@ -156,6 +163,21 @@ def check(vacancy: Vacancy, profile: dict) -> str | None:
             return "salary"
         if maximum and vacancy.salary > maximum:
             return "salary"
+
+
+    # Общее правило «грейд не назван — вакансия проходит» верно для мидлов
+    # и сеньоров: безымянная масса как раз их уровня. Для входа в профессию
+    # оно переворачивается и топит человека. Замер 28.08.2026 по профилю
+    # «только стажёр»: проходило 17 вакансий, из них 16 без грейда и с вилками
+    # под мидла, и лишь одна настоящая стажировка. Распознать уровень нечем:
+    # опыт у безгрейдовых не указан ни разу (0 из 121), вилка есть у трети.
+    #
+    # Проверка стоит последней нарочно: так в счётчик «скрыто» попадают
+    # только те вакансии, которые прошли всё остальное. Стой она первой,
+    # человеку показали бы число вчетверо больше — вместе с теми, что
+    # всё равно отсеялись бы по роли.
+    if grades and not vacancy.grade and set(grades) <= ENTRY_GRADES:
+        return "grade_unknown"
 
     return None
 
@@ -335,15 +357,35 @@ def _line(vacancy: Vacancy) -> str:
     return f"▸ <b>{_escape(vacancy.title)}</b>\n   {line} · {link}"
 
 
-def build_digest(vacancies: list[Vacancy]) -> str:
+def build_digest(vacancies: list[Vacancy], held_back: int = 0) -> str:
+    """held_back — сколько вакансий скрыто из-за неназванного грейда.
+    Молчать об этом нельзя: у тех, кто ищет стажировку, подборка выходит
+    короткой, и без объяснения это неотличимо от поломки бота."""
     today = date.today()
     header = f"<b>Дайджест {today.day} {MONTHS[today.month - 1]}</b>"
 
+    note = ""
+    if held_back:
+        note = (
+            f"\n\nСкрыто ещё {held_back} "
+            + _plural_hidden(held_back)
+            + ": в них уровень не назван, а такие вакансии почти всегда "
+            "на мидла. Чтобы видеть и их, добавь в /settings нужный грейд."
+        )
+
     if not vacancies:
-        return header + "\nСегодня ничего нового по твоим фильтрам."
+        return header + "\nСегодня ничего нового по твоим фильтрам." + note
 
     header += f" · {len(vacancies)} " + _plural(len(vacancies))
-    return header + "\n\n" + "\n\n".join(_line(v) for v in vacancies)
+    return header + "\n\n" + "\n\n".join(_line(v) for v in vacancies) + note
+
+
+def _plural_hidden(n: int) -> str:
+    if n % 10 == 1 and n % 100 != 11:
+        return "вакансия"
+    if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
+        return "вакансии"
+    return "вакансий"
 
 
 def _plural(n: int) -> str:

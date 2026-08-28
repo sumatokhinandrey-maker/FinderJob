@@ -36,11 +36,11 @@ def first_digest(user: dict) -> None:
         return
 
     vacancies = core.fill_grades(core.from_rows(rows))
-    passed, _ = core.apply_filters(vacancies, prof.to_filters(user["profile"]))
+    passed, rejected = core.apply_filters(vacancies, prof.to_filters(user["profile"]))
     seen = user.get("seen") or {}
     fresh = core.only_new(passed, seen)
 
-    tg.send(user["chat_id"], core.build_digest(fresh))
+    tg.send(user["chat_id"], core.build_digest(fresh, rejected.get("grade_unknown", 0)))
     stats.track("digest_sent")
     stats.track("vacancies_sent", len(fresh))
 
