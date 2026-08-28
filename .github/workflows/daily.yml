@@ -12,7 +12,12 @@ on:
     - cron: "37 7 * * *"   # 10:37 МСК
     - cron: "37 9 * * *"   # 12:37 МСК
     - cron: "37 13 * * *"  # 16:37 МСК
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Разослать, даже если сегодняшний дайджест уже ушёл"
+        type: boolean
+        default: false
 
 jobs:
   digest:
@@ -29,7 +34,12 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
           KV_REST_API_TOKEN: ${{ secrets.KV_REST_API_TOKEN }}
-          # Запуск руками — всегда рассылка. По расписанию — только если
-          # сегодняшней ещё не было.
-          ONCE: ${{ github.event_name == 'schedule' && '--once-a-day' || '' }}
+          # Защита от повторной рассылки включена всегда, кроме случая,
+          # когда её сняли галочкой force при ручном запуске.
+          #
+          # Раньше здесь стояло условие «только для schedule», и это была
+          # дыра: будильник снаружи (QStash) дёргает workflow_dispatch,
+          # то есть оба его запуска — утренний и полуденный — слали бы
+          # дайджест, и человек получал бы его дважды.
+          ONCE: ${{ inputs.force && '' || '--once-a-day' }}
         run: python3 main.py $ONCE
