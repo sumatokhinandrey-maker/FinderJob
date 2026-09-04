@@ -67,13 +67,23 @@ def grade_from_title(title: str) -> str | None:
 
 
 def fill_grades(vacancies: list[Vacancy]) -> list[Vacancy]:
-    """Проставить грейд там, где источник его не дал, но заголовок называет."""
+    """Грейд из заголовка. Он главнее поля источника, а не только затыкает
+    пустоту.
+
+    Замер 04.09.2026 по 449 вакансиям: поле и заголовок разошлись шесть раз,
+    и все шесть — в пользу заголовка. «Staff Designer» у Сбера getmatch отдал
+    как middle, «Ведущий дизайнер продукта» у VK — как senior; человек с
+    фильтром «мидл» получал вакансии на лида. Обратное расхождение —
+    когда поле точнее заголовка — не встретилось ни разу.
+
+    Отдельно чинится случай «Middle+/Senior UX Designer»: источник пишет
+    только middle, заголовок называет оба грейда, и сеньор такую вакансию
+    не видел."""
     out = []
     for vacancy in vacancies:
-        if not vacancy.grade:
-            guess = grade_from_title(vacancy.title)
-            if guess:
-                vacancy = replace(vacancy, grade=guess)
+        guess = grade_from_title(vacancy.title)
+        if guess and guess != vacancy.grade:
+            vacancy = replace(vacancy, grade=guess)
         out.append(vacancy)
     return out
 
