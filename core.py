@@ -137,8 +137,12 @@ def check(vacancy: Vacancy, profile: dict) -> str | None:
             if not set(vacancy.grade.split(",")) & set(grades):
                 return "grade"
 
+    # Сверяем только с заголовком, не со всем текстом: описание рекрутёра,
+    # фронтендера или геймдев-программиста тоже может упомянуть «UI»/«UX»/
+    # «интерфейс» мимоходом, и по всему тексту (haystack) такая вакансия
+    # ложно проходила бы фильтр роли. Заголовок источники называют прямо.
     include = [w.lower() for w in profile.get("include_any", [])]
-    if include and not any(word in text for word in include):
+    if include and not any(word in vacancy.title.lower() for word in include):
         return "role"
 
     for word in profile.get("exclude_any", []):
