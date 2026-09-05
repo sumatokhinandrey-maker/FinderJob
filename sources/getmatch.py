@@ -36,7 +36,7 @@ USER_AGENT = "Mozilla/5.0 (Macintosh) FinderJob/0.1 (personal job digest)"
 
 # getmatch раскладывает дизайн ровно по двум специализациям.
 # Всё остальное у них — разработка, туда не ходим.
-SPECIALIZATIONS = ["product_design", "ux_writer"]
+DEFAULT_ROUTES = ["product_design", "ux_writer"]
 
 FORMATS = {"remote": "remote", "hybrid": "hybrid", "office": "office"}
 
@@ -116,11 +116,11 @@ def _grade(offer_id: str | int) -> str | None:
     return SENIORITY.get(detail.get("seniority") or "")
 
 
-def list_recent(since: str) -> list[dict]:
+def list_recent(since: str, routes: list[str] | None = None) -> list[dict]:
     """Свежие вакансии обеих дизайнерских специализаций."""
     out: list[dict] = []
     seen: set[str] = set()
-    for spec in SPECIALIZATIONS:
+    for spec in routes or DEFAULT_ROUTES:
         offset = 0
         while True:
             query = urllib.parse.urlencode(
@@ -150,8 +150,9 @@ def list_recent(since: str) -> list[dict]:
     return out
 
 
-def collect(since: str, limit: int | None = None) -> list[Vacancy]:
-    offers = list_recent(since)
+def collect(since: str, limit: int | None = None,
+            routes: list[str] | None = None) -> list[Vacancy]:
+    offers = list_recent(since, routes)
     if limit:
         offers = offers[:limit]
 

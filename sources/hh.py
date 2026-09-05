@@ -40,7 +40,7 @@ AREA_RUSSIA = 113
 # и не листается, поэтому запросов немного и каждый узкий.
 # Каждый запрос — свои 20 свежих, поэтому лишний запрос это лишние вакансии,
 # а не лишние страницы одной выдачи. Пересечения снимает склейка дублей.
-QUERIES = [
+DEFAULT_ROUTES = [
     "продуктовый дизайнер",
     "ux/ui дизайнер",
     "веб-дизайнер",
@@ -145,12 +145,14 @@ def parse_item(item: str, work_format: str) -> Vacancy | None:
     )
 
 
-def collect(since: str, limit: int | None = None) -> list[Vacancy]:
+def collect(since: str, limit: int | None = None,
+            routes: list[str] | None = None) -> list[Vacancy]:
     """Лента отдаёт 20 свежих на запрос и не листается, поэтому since здесь
     не работает — новизну определяет память о показанном."""
     seen: set[str] = set()
     vacancies: list[Vacancy] = []
-    requests = [(q, code, fmt) for q in QUERIES for code, fmt in FORMATS.items()]
+    queries = routes or DEFAULT_ROUTES
+    requests = [(q, code, fmt) for q in queries for code, fmt in FORMATS.items()]
 
     for index, (query, code, work_format) in enumerate(requests):
         params = urllib.parse.urlencode(

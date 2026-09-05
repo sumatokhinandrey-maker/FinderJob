@@ -6,10 +6,20 @@
       "status": "connected",
       "route_kind": "sitemap",
       "routes": {
-        "design": ["sitemap-vacancies-design.xml"],
-        "dev": ["sitemap-vacancies-development.xml", "sitemap-vacancies-qa.xml"],
-        "content": ["sitemap-vacancies-marketing.xml"],
-        "product": ["sitemap-vacancies-analytics.xml", "sitemap-vacancies-management.xml"]
+        "design": [
+          "sitemap-vacancies-design.xml"
+        ],
+        "dev": [
+          "sitemap-vacancies-development.xml",
+          "sitemap-vacancies-qa.xml"
+        ],
+        "content": [
+          "sitemap-vacancies-marketing.xml"
+        ],
+        "product": [
+          "sitemap-vacancies-analytics.xml",
+          "sitemap-vacancies-management.xml"
+        ]
       }
     },
     "hh": {
@@ -17,22 +27,65 @@
       "status": "connected",
       "route_kind": "query",
       "routes": {
-        "design.product": ["продуктовый дизайнер", "ux/ui дизайнер", "дизайнер интерфейсов", "product designer", "ui дизайнер"],
-        "design.web": ["веб-дизайнер"],
-        "design.graphic": ["графический дизайнер"],
-        "design.motion": ["моушн дизайнер"],
-        "content.copywriter": ["копирайтер"],
-        "content.editor": ["редактор"],
-        "content.smm": ["smm-специалист", "smm-менеджер"],
-        "content.maker": ["контент-менеджер", "контент-мейкер"],
-        "dev.frontend": ["frontend разработчик", "react разработчик"],
-        "dev.backend": ["backend разработчик", "python разработчик"],
-        "dev.mobile": ["ios разработчик", "android разработчик"],
-        "dev.fullstack": ["fullstack разработчик"],
-        "dev.qa": ["qa инженер", "тестировщик"],
-        "product.manager": ["продакт-менеджер"],
-        "product.analyst": ["продуктовый аналитик", "аналитик данных"],
-        "product.project": ["проджект-менеджер"]
+        "design.product": [
+          "продуктовый дизайнер",
+          "ux/ui дизайнер",
+          "дизайнер интерфейсов",
+          "product designer",
+          "ui дизайнер"
+        ],
+        "design.web": [
+          "веб-дизайнер"
+        ],
+        "design.graphic": [
+          "графический дизайнер"
+        ],
+        "design.motion": [
+          "моушн дизайнер"
+        ],
+        "content.copywriter": [
+          "копирайтер"
+        ],
+        "content.editor": [
+          "редактор"
+        ],
+        "content.smm": [
+          "smm-специалист",
+          "smm-менеджер"
+        ],
+        "content.maker": [
+          "контент-менеджер",
+          "контент-мейкер"
+        ],
+        "dev.frontend": [
+          "frontend разработчик",
+          "react разработчик"
+        ],
+        "dev.backend": [
+          "backend разработчик",
+          "python разработчик"
+        ],
+        "dev.mobile": [
+          "ios разработчик",
+          "android разработчик"
+        ],
+        "dev.fullstack": [
+          "fullstack разработчик"
+        ],
+        "dev.qa": [
+          "qa инженер",
+          "тестировщик"
+        ],
+        "product.manager": [
+          "продакт-менеджер"
+        ],
+        "product.analyst": [
+          "продуктовый аналитик",
+          "аналитик данных"
+        ],
+        "product.project": [
+          "проджект-менеджер"
+        ]
       }
     },
     "habr": {
@@ -40,14 +93,35 @@
       "status": "connected",
       "route_kind": "rubric",
       "routes": {
-        "design": ["dizajner", "ui_ux_designer", "ux_designer", "veb_dizajner", "digital_dizajner", "razrabotchik_interfejsov"],
-        "dev.frontend": ["frontend_razrabotchik"],
-        "dev.backend": ["backend_razrabotchik"],
-        "content.copywriter": ["kopirajter"],
-        "content.maker": ["kontent_menedzher"],
-        "content.smm": ["marketolog"],
-        "product.manager": ["menedzher_po_produktu"],
-        "product.analyst": ["analitik"]
+        "design": [
+          "dizajner",
+          "ui_ux_designer",
+          "ux_designer",
+          "veb_dizajner",
+          "digital_dizajner",
+          "razrabotchik_interfejsov"
+        ],
+        "dev.frontend": [
+          "frontend_razrabotchik"
+        ],
+        "dev.backend": [
+          "backend_razrabotchik"
+        ],
+        "content.copywriter": [
+          "kopirajter"
+        ],
+        "content.maker": [
+          "kontent_menedzher"
+        ],
+        "content.smm": [
+          "marketolog"
+        ],
+        "product.manager": [
+          "menedzher_po_produktu"
+        ],
+        "product.analyst": [
+          "analitik"
+        ]
       }
     },
     "getmatch": {
@@ -55,17 +129,55 @@
       "status": "connected",
       "route_kind": "specialization",
       "routes": {
-        "design.product": ["product_design"],
-        "content.copywriter": ["ux_writer", "tech_writer"],
-        "content.smm": ["marketing"],
-        "dev.frontend": ["js_frontend", "typescript"],
-        "dev.backend": ["python", "java_scala", "golang", "php", "js_backend", "c_sharp", "ruby"],
-        "dev.mobile": ["ios", "android", "kotlin", "cross_platform_flutter_react_native"],
-        "dev.fullstack": ["fullstack"],
-        "dev.qa": ["qa_auto", "qa_manual"],
-        "product.manager": ["product_management"],
-        "product.analyst": ["product_analyst", "data_analyst_bi", "system_analyst", "business_analyst"],
-        "product.project": ["project_management"]
+        "design.product": [
+          "product_design",
+          "ux_writer"
+        ],
+        "content.copywriter": [
+          "ux_writer",
+          "tech_writer"
+        ],
+        "content.smm": [
+          "marketing"
+        ],
+        "dev.frontend": [
+          "js_frontend",
+          "typescript"
+        ],
+        "dev.backend": [
+          "python",
+          "java_scala",
+          "golang",
+          "php",
+          "js_backend",
+          "c_sharp",
+          "ruby"
+        ],
+        "dev.mobile": [
+          "ios",
+          "android",
+          "kotlin",
+          "cross_platform_flutter_react_native"
+        ],
+        "dev.fullstack": [
+          "fullstack"
+        ],
+        "dev.qa": [
+          "qa_auto",
+          "qa_manual"
+        ],
+        "product.manager": [
+          "product_management"
+        ],
+        "product.analyst": [
+          "product_analyst",
+          "data_analyst_bi",
+          "system_analyst",
+          "business_analyst"
+        ],
+        "product.project": [
+          "project_management"
+        ]
       }
     },
     "careerspace": {
@@ -73,8 +185,12 @@
       "status": "connected",
       "route_kind": "collection",
       "routes": {
-        "design.product": ["ux_ui"],
-        "design.graphic": ["graphic_design"]
+        "design.product": [
+          "ux_ui"
+        ],
+        "design.graphic": [
+          "graphic_design"
+        ]
       }
     },
     "designer": {
@@ -82,7 +198,9 @@
       "status": "connected",
       "route_kind": "board",
       "routes": {
-        "design": ["all"]
+        "design": [
+          "all"
+        ]
       }
     },
     "companies": {
@@ -91,7 +209,18 @@
       "route_kind": "all",
       "_note": "Яндекс, VK, Т-Банк, МТС, Магнит отдают все свои вакансии разом — направление отбирается фильтром роли, отдельных адресов нет.",
       "routes": {
-        "design": ["*"], "dev": ["*"], "content": ["*"], "product": ["*"]
+        "design": [
+          "*"
+        ],
+        "dev": [
+          "*"
+        ],
+        "content": [
+          "*"
+        ],
+        "product": [
+          "*"
+        ]
       }
     },
     "telegram": {
@@ -100,7 +229,10 @@
       "route_kind": "channel",
       "_note": "Читается через веб-ленту t.me/s/, без аккаунта и ключей. Каналы под разработку и контент ещё не найдены.",
       "routes": {
-        "design": ["designhunters", "designoffers"]
+        "design": [
+          "designhunters",
+          "designoffers"
+        ]
       }
     }
   }

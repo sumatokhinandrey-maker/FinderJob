@@ -28,7 +28,7 @@ from html import unescape
 from core import Vacancy
 
 BASE = "https://careerspace.app"
-COLLECTIONS = ["ux_ui"]
+DEFAULT_ROUTES = ["ux_ui"]
 
 # Сайт не отвечает на нестандартные User-Agent, поэтому представляемся браузером.
 USER_AGENT = (
@@ -88,12 +88,12 @@ def _grade(title: str) -> str | None:
     return ",".join(found) or None
 
 
-def list_recent(since: str) -> list[tuple[str, list[str]]]:
+def list_recent(since: str, routes: list[str] | None = None) -> list[tuple[str, list[str]]]:
     """Адреса вакансий вместе с разобранной карточкой: город и формат работы
     есть только в списке, на самой странице вакансии их нет."""
     out: list[tuple[str, list[str]]] = []
     seen: set[str] = set()
-    for slug in COLLECTIONS:
+    for slug in routes or DEFAULT_ROUTES:
         try:
             html = _fetch(f"{BASE}/collection/{slug}")
         except (urllib.error.URLError, TimeoutError) as exc:
@@ -143,8 +143,9 @@ def parse_vacancy(url: str, parts: list[str], html: str) -> Vacancy | None:
     )
 
 
-def collect(since: str, limit: int | None = None) -> list[Vacancy]:
-    cards = list_recent(since)
+def collect(since: str, limit: int | None = None,
+            routes: list[str] | None = None) -> list[Vacancy]:
+    cards = list_recent(since, routes)
     if limit:
         cards = cards[:limit]
 

@@ -18,7 +18,12 @@ from html import unescape
 
 from core import Vacancy
 
-SITEMAP = "https://hirehi.ru/sitemap-vacancies-design.xml"
+SITEMAP_BASE = "https://hirehi.ru/"
+# Дизайн — маршрут по умолчанию, чтобы старые вызовы collect(since) работали
+# как раньше. Рядом лежат sitemap-vacancies-development.xml, ...-qa.xml,
+# ...-marketing.xml, ...-analytics.xml, ...-management.xml — sitemap.xml
+# перечисляет десять сфер, проверено 05.09.2026.
+DEFAULT_ROUTES = ["sitemap-vacancies-design.xml"]
 USER_AGENT = "JobResearchBot/0.1 (personal job digest; +https://github.com/)"
 
 # Пауза между запросами к страницам вакансий. Мы ходим по чужому сайту
@@ -45,18 +50,21 @@ def _fetch(url: str, timeout: int = 30) -> str:
     return raw.decode("utf-8", "replace")
 
 
-def list_recent(since: str) -> list[str]:
+def list_recent(since: str, routes: list[str] | None = None) -> list[str]:
     """URL вакансий, обновлённых не раньше даты since (YYYY-MM-DD).
 
+    routes — какие sitemap обойти: у каждой профессиональной сферы свой.
     Sitemap отсортирован по алфавиту, поэтому пересортировываем по дате —
     иначе --limit будет обрезать не самое свежее, а всё на букву «а».
     """
-    sitemap = _fetch(SITEMAP)
-    recent = [
-        (loc, lastmod)
-        for loc, lastmod in _SITEMAP_RE.findall(sitemap)
-        if lastmod >= since
-    ]
+    pairs = []
+    for name in routes or DEFAULT_ROUTES:
+        try:
+            pairs += _SITEMAP_RE.findall(_fetch(SITEMAP_BASE + name))
+        except (urllib.error.URLError, TimeoutError) as exc:
+            # Одна упавшая сфера не должна ронять остальные.
+            print(f"  ! hirehi не отдал {name}: {exc}")
+    recent = [(loc, lastmod) for loc, lastmod in pairs if lastmod >= since]
     recent.sort(key=lambda pair: pair[1], reverse=True)
     return [loc for loc, _ in recent]
 
@@ -151,9 +159,10 @@ def parse_vacancy(url: str, html: str) -> Vacancy | None:
     )
 
 
-def collect(since: str, limit: int | None = None) -> list[Vacancy]:
+def collect(since: str, limit: int | None = None,
+            routes: list[str] | None = None) -> list[Vacancy]:
     """Вакансии, обновлённые начиная с даты since."""
-    urls = list_recent(since)
+    urls = list_recent(since, routes)
     if limit:
         urls = urls[:limit]
 

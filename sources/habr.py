@@ -28,7 +28,7 @@ USER_AGENT = "JobResearchBot/0.1 (personal job digest; +https://github.com/)"
 # Рубрики, которые нас касаются. Графика, полиграфия, 3D и иллюстрация
 # у Хабра лежат отдельными рубриками — их не берём вовсе, вместо того
 # чтобы потом отсеивать стоп-словами.
-CATEGORIES = [
+DEFAULT_ROUTES = [
     "dizajner",
     "ui_ux_designer",
     "ux_designer",
@@ -76,7 +76,7 @@ def _fetch(url: str, timeout: int = 30, tries: int = 3) -> str:
     raise last if last else RuntimeError(f"не удалось получить {url}")
 
 
-def list_recent(since: str) -> list[str]:
+def list_recent(since: str, routes: list[str] | None = None) -> list[str]:
     """Адреса вакансий из дизайнерских рубрик.
 
     Даты обновления на страницах рубрик нет, поэтому since здесь не работает —
@@ -84,7 +84,7 @@ def list_recent(since: str) -> list[str]:
     десятка вакансий, так что лишнего не наберётся.
     """
     ids: list[str] = []
-    for slug in CATEGORIES:
+    for slug in routes or DEFAULT_ROUTES:
         try:
             html = _fetch(f"{BASE}/vacancies/{slug}")
         except (urllib.error.URLError, TimeoutError) as exc:
@@ -172,8 +172,9 @@ def parse_vacancy(url: str, html: str) -> Vacancy | None:
     )
 
 
-def collect(since: str, limit: int | None = None) -> list[Vacancy]:
-    urls = list_recent(since)
+def collect(since: str, limit: int | None = None,
+            routes: list[str] | None = None) -> list[Vacancy]:
+    urls = list_recent(since, routes)
     if limit:
         urls = urls[:limit]
 

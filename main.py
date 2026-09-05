@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT))
 
 import core  # noqa: E402
 from finderjob import profile as prof  # noqa: E402
-from finderjob import stats, store, tg  # noqa: E402
+from finderjob import stats, store, taxonomy, tg  # noqa: E402
 from sources import (careerspace, companies, designer, getmatch,  # noqa: E402
                      habr, hh, hirehi)
 
@@ -131,6 +131,13 @@ def main() -> int:
     # Повторов это не создаёт — их отсекает память о показанном.
     windows = config.get("lookback_days_by_source") or {}
 
+    # Маршрутный лист: куда идти ради тех профессий, которые кто-нибудь
+    # из подписчиков ищет. Раньше обход был слепым — все источники всегда,
+    # а больше половины собранного выбрасывалось фильтром роли.
+    wanted = sorted({role for user in users for role in prof.roles_of(user["profile"])})
+    routes = taxonomy.plan(wanted)
+    print(f"Ищем профессии: {', '.join(taxonomy.label(r) for r in wanted)}")
+
     print(f"Собираю вакансии с {since}…")
     vacancies = []
     for name, key, source in (("hirehi", "hirehi", hirehi), ("habr", "habr", habr),
@@ -140,8 +147,12 @@ def main() -> int:
                               ("карьерные сайты", "companies", companies)):
         own = windows.get(key)
         start = (date.today() - timedelta(days=own)).isoformat() if own else since
+        plan = routes.get(key)
+        if not plan:
+            # Источник по этим профессиям ничего не отдаёт — ходить незачем.
+            continue
         try:
-            found = source.collect(start, limit=args.limit)
+            found = source.collect(start, limit=args.limit, routes=plan)
         except Exception as exc:
             # Упавший источник не должен ронять рассылку целиком:
             # лучше дайджест по одной площадке, чем молчание.

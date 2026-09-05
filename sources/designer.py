@@ -261,7 +261,8 @@ def _enrich(card: dict) -> tuple[str | None, int | None]:
     return grade, salary
 
 
-def collect(since: str, limit: int | None = None) -> list[Vacancy]:
+def collect(since: str, limit: int | None = None,
+            routes: list[str] | None = None) -> list[Vacancy]:
     cards = list_recent(since)
     if limit:
         cards = cards[:limit]

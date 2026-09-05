@@ -240,7 +240,8 @@ ADAPTERS = {
 }
 
 
-def collect(since: str, limit: int | None = None) -> list[Vacancy]:
+def collect(since: str, limit: int | None = None,
+            routes: list[str] | None = None) -> list[Vacancy]:
     """Упавшая компания не должна ронять остальные: карьерные сайты меняют
     вёрстку и API без предупреждения, это их право."""
     out: list[Vacancy] = []
