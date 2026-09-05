@@ -3,15 +3,27 @@
 Весь диалог — одна карточка, которая переписывается на месте. Человек видит
 не простыню из десяти сообщений, а один экран, который меняется под нажатия.
 
-«Неважно» на любом шаге стирает критерий и ведёт дальше: незаполненное
-поле ничего не отсекает.
+Кнопка «Любая»/«Любой» стирает критерий и ведёт дальше: незаполненное поле
+ничего не отсекает. У грейда её нет — там выбор обязателен, потому что
+неназванный уровень был главным источником нерелевантных вакансий.
 """
 
 from __future__ import annotations
 
 from finderjob import profile as prof
+from finderjob import taxonomy
 
-STEPS = ["grade", "salary", "format", "cities"]
+STEPS = ["direction", "role", "grade", "salary", "format"]
+
+# Слово согласуется с существительным шага: «Зарплата — любая», но
+# «Формат работы — любой». У grade и direction кнопки нет вовсе.
+SKIP_LABEL = {
+    "role": "Все роли",
+    "salary": "Любая",
+    "format": "Любой",
+    "region": "Любой",
+    "sources": "Все",
+}
 
 CHECK = "✓ "  # галочка перед выбранным пунктом
 
@@ -42,33 +54,29 @@ HELP = (
     "/settings — посмотреть и поменять критерии\n"
     "/stop — отписаться от дайджеста\n\n"
     "Вакансии беру с hirehi, hh.ru, Хабр Карьеры, getmatch, careerspace, "
-    "designer.ru и карьерных сайтов компаний. Роль фиксированная — "
-    "продуктовый, UX/UI и веб-дизайн; графику, моушн и 3D отсекаю."
+    "designer.ru и карьерных сайтов компаний. Профессию выбираешь сам — "
+    "дизайн, контент, разработка или продукт."
 )
 
 # Пороги зарплаты. Нижняя граница, а не вилка: верхняя отсекала бы и тех,
 # кто платит больше потолка, — на этом уже обжигались.
 SALARY_STEPS = [100_000, 150_000, 200_000, 250_000]
 
-ASK_CITIES = (
-    "<b>Шаг 4 из 4. Город</b>\n\n"
-    "Напиши город или несколько через запятую. Например: Москва, Казань."
-)
-
-BAD_CITIES = "Не разобрал ни одного города. Напиши названия через запятую."
-
 QUESTIONS = {
-    "grade": "<b>Шаг 1 из 4. Грейд</b>",
+    "direction": "<b>Шаг 1 из 5. Направление</b>\n\nЧем занимаешься.",
+    "role": "<b>Шаг 2 из 5. Роль</b>",
+    "grade": "<b>Шаг 3 из 5. Грейд</b>",
     "salary": (
-        "<b>Шаг 2 из 4. Зарплата</b>\n\n"
+        "<b>Шаг 4 из 5. Зарплата</b>\n\n"
         "Нижняя граница. Вакансии без указанной вилки не отсекаю — "
         "их большинство."
     ),
-    "format": "<b>Шаг 3 из 4. Формат работы</b>",
-    "cities": (
-        "<b>Шаг 4 из 4. Город</b>\n\n"
-        "Где готов ездить в офис. На удалённые вакансии это не влияет."
+    "format": "<b>Шаг 5 из 5. Формат работы</b>",
+    "region": (
+        "<b>Регион</b>\n\n"
+        "Где готов ездить в офис. На удалённые вакансии не влияет."
     ),
+    "sources": "<b>Источники</b>\n\nОткуда брать вакансии.",
 }
 
 
@@ -86,20 +94,15 @@ def _rows(buttons: list[dict], per_row: int = 2) -> list[list[dict]]:
 
 
 def next_step(step: str, profile: dict) -> str | None:
-    """Шаг вперёд. Про место спрашиваем только тех, кто готов куда-то ездить."""
-    for candidate in STEPS[STEPS.index(step) + 1 :]:
-        if candidate == "cities" and not prof.needs_cities(profile):
-            continue
-        return candidate
-    return None
+    order = STEPS[STEPS.index(step) + 1 :] if step in STEPS else []
+    return order[0] if order else None
 
 
 def prev_step(step: str, profile: dict) -> str | None:
-    for candidate in reversed(STEPS[: STEPS.index(step)]):
-        if candidate == "cities" and not prof.needs_cities(profile):
-            continue
-        return candidate
-    return None
+    if step not in STEPS:
+        return None
+    order = STEPS[: STEPS.index(step)]
+    return order[-1] if order else None
 
 
 # --------------------------------------------------------------------------
@@ -123,13 +126,61 @@ def _tail(step: str, profile: dict, mode: str) -> list[list[dict]]:
     if prof.step_filled(profile, step):
         nav.append(_button("Сохранить" if mode == "edit" else "Продолжить", f"nx:{step}"))
 
-    rows = [[_button("Неважно", f"sk:{step}")]]
+    rows = []
+    label = SKIP_LABEL.get(step)
+    if label:
+        rows.append([_button(label, f"sk:{step}")])
     if nav:
         rows.append(nav)
     return rows
 
 
 def keyboard(step: str, profile: dict, mode: str) -> list[list[dict]]:
+    if step == "direction":
+        chosen = prof.directions_of(profile)
+        buttons = [
+            _button(f"{CHECK if key in chosen else ''}{body['label']}", f"td:{key}")
+            for key, body in taxonomy.roles().items()
+        ]
+        return _rows(buttons) + _tail(step, profile, mode)
+
+    if step == "role":
+        # Показываем роли только выбранных направлений: тридцать кнопок
+        # списком в телеграме — простыня, которую не читают.
+        chosen = profile.get("roles") or []
+        buttons = []
+        for direction in prof.directions_of(profile):
+            for key, body in taxonomy.roles()[direction]["roles"].items():
+                full = f"{direction}.{key}"
+                buttons.append(
+                    _button(f"{CHECK if full in chosen else ''}{body['label']}", f"tr:{full}")
+                )
+        return _rows(buttons) + _tail(step, profile, mode)
+
+    if step == "region":
+        chosen = profile.get("regions") or []
+        buttons = [
+            _button(f"{CHECK if value in chosen else ''}{label}", f"trg:{value}")
+            for value, label in prof.REGIONS
+        ]
+        return _rows(buttons) + _tail(step, profile, mode)
+
+    if step == "sources":
+        # Рядом с каждой площадкой — что она даст именно по твоим профессиям.
+        # Без этого можно выбрать фронтенд вместе с designer.ru и ждать
+        # вакансий, которых оттуда не будет никогда.
+        chosen = profile.get("sources") or []
+        fits = taxonomy.coverage(prof.roles_of(profile))
+        buttons = []
+        for key, body in taxonomy.sources().items():
+            if body.get("status") != "connected":
+                continue
+            covers = fits.get(key) or []
+            mark = CHECK if key in chosen else ""
+            note = "" if covers else " (не даёт)"
+            buttons.append(_button(f"{mark}{body['label']}{note}", f"tsrc:{key}"))
+        return _rows(buttons) + _tail(step, profile, mode)
+
     if step == "grade":
         chosen = profile.get("grades") or []
         buttons = [
@@ -157,28 +208,18 @@ def keyboard(step: str, profile: dict, mode: str) -> list[list[dict]]:
         ]
         return _rows(buttons, 3) + _tail(step, profile, mode)
 
-    if step == "cities":
-        picked = profile.get("places") or []
-        rows = _rows(
-            [
-                _button(f"{CHECK if value in picked else ''}{label}", f"tp:{value}")
-                for value, label in prof.PLACES
-            ]
-        )
-        # Города, введённые руками, показываем отдельными кнопками —
-        # так их видно и так же легко снять.
-        own = profile.get("cities") or []
-        rows += _rows([_button(f"{CHECK}{name}", f"tc:{name}") for name in own[:6]])
-        rows += [[_button("Свой город(а)", "in:cities")]]
-        return rows + _tail(step, profile, mode)
-
     return []
 
 
 def settings_keyboard() -> list[list[dict]]:
+    """Мастер отвечает на «кого ищем», фильтры — на «где и откуда».
+    Регион и источники в мастер не выносим: их тронут единицы, а каждый
+    лишний шаг теряет людей на входе."""
     return [
+        [_button("Направление", "ed:direction"), _button("Роль", "ed:role")],
         [_button("Грейд", "ed:grade"), _button("Зарплата", "ed:salary")],
-        [_button("Формат работы", "ed:format"), _button("Город", "ed:cities")],
+        [_button("Формат работы", "ed:format")],
+        [_button("Регион", "ed:region"), _button("Источники", "ed:sources")],
         [_button("Сбросить все фильтры", "go")],
     ]
 
@@ -205,10 +246,12 @@ def render_settings(profile: dict) -> tuple[str, list[list[dict]]]:
 # --------------------------------------------------------------------------
 
 CLEARS = {
+    "role": ["roles"],
     "grade": ["grades"],
     "salary": ["salary_min", "salary_max"],
     "format": ["formats"],
-    "cities": ["places", "cities"],
+    "region": ["regions"],
+    "sources": ["sources"],
 }
 
 
@@ -220,7 +263,18 @@ def _toggle(items: list, value: str) -> None:
 
 
 def skip(step: str, profile: dict) -> None:
-    """«Неважно» — стереть критерий этого шага."""
+    """«Любая»/«Любой» — стереть критерий этого шага.
+
+    На шаге ролей это значит «все роли выбранных направлений»: пустой
+    список ролей означал бы поиск вообще без профессии.
+    """
+    if step == "role":
+        profile["roles"] = [
+            f"{direction}.{role}"
+            for direction in prof.directions_of(profile)
+            for role in taxonomy.roles()[direction]["roles"]
+        ]
+        return
     for field in CLEARS.get(step, []):
         profile[field] = None if field.startswith("salary") else []
 
@@ -229,14 +283,29 @@ def apply(data: str, user: dict) -> None:
     """Применяем нажатие к профилю. Переходы между шагами делает вызывающий."""
     profile = user["profile"]
 
-    if data.startswith("tg:"):
+    if data.startswith("td:"):
+        # Направление хранится не отдельно, а через роли: сняли направление —
+        # ушли и его роли, иначе выбор разъезжается сам с собой.
+        direction = data[3:]
+        roles = profile.setdefault("roles", [])
+        mine = [r for r in roles if r.startswith(f"{direction}.")]
+        if mine:
+            for role in mine:
+                roles.remove(role)
+        else:
+            roles.extend(
+                f"{direction}.{role}" for role in taxonomy.roles()[direction]["roles"]
+            )
+    elif data.startswith("trg:"):
+        _toggle(profile.setdefault("regions", []), data[4:])
+    elif data.startswith("tsrc:"):
+        _toggle(profile.setdefault("sources", []), data[5:])
+    elif data.startswith("tr:"):
+        _toggle(profile.setdefault("roles", []), data[3:])
+    elif data.startswith("tg:"):
         _toggle(profile.setdefault("grades", []), data[3:])
     elif data.startswith("tf:"):
         _toggle(profile.setdefault("formats", []), data[3:])
-    elif data.startswith("tp:"):
-        _toggle(profile.setdefault("places", []), data[3:])
-    elif data.startswith("tc:"):
-        _toggle(profile.setdefault("cities", []), data[3:])
     elif data.startswith("ts:"):
         # Повторное нажатие снимает порог: иначе выбранное не отменить,
         # не сбрасывая шаг целиком.

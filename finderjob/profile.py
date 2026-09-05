@@ -28,13 +28,18 @@ FORMATS = [
     ("office", "Офис"),
 ]
 
-# Корзины мест. Конкретные города человек добавляет сам, списком через запятую.
-PLACES = [
-    ("russia", "Города России"),
-    ("abroad", "За рубежом"),
+# Регион вместо ввода городов руками: четыре корзины закрывают тот же вопрос
+# без клавиатуры. Пустой выбор значит «любой».
+REGIONS = [
+    ("ru", "Россия"),
+    ("cis", "СНГ"),
+    ("abroad", "Зарубежные"),
 ]
 
-ANY = "неважно"
+# Слово согласуется с существительным шага, поэтому одной константы мало:
+# «Зарплата: любая», но «Формат работы: любой».
+ANY = "любой"
+ANY_F = "любая"
 
 # Роли по умолчанию — то же, что бот искал, когда роль была общей для всех
 # и означала «дизайн». Нужны для тех, кто прошёл мастер до появления выбора
@@ -52,12 +57,13 @@ def blank() -> dict:
     не подходит». Так человек, бросивший мастер на середине, всё равно
     получит дайджест."""
     return {
+        "roles": [],
         "grades": [],
         "salary_min": None,
         "salary_max": None,
         "formats": [],
-        "places": [],
-        "cities": [],
+        "regions": [],
+        "sources": [],
     }
 
 
@@ -74,10 +80,10 @@ def new_user(chat_id: int, username: str | None, today: str) -> dict:
     }
 
 
-def needs_cities(profile: dict) -> bool:
-    """Про место спрашиваем, только если человек готов куда-то ездить.
+def needs_region(profile: dict) -> bool:
+    """Регион имеет смысл, только если человек готов куда-то ездить.
     Пустой список форматов — это «пропущено», то есть офис и гибрид тоже
-    подходят, и место снова имеет значение."""
+    подходят, и место снова важно."""
     formats = profile.get("formats") or []
     if not formats:
         return True
@@ -93,15 +99,59 @@ def step_filled(profile: dict, step: str) -> bool:
         return bool(profile.get("salary_min") or profile.get("salary_max"))
     if step == "format":
         return bool(profile.get("formats"))
-    if step == "cities":
-        return bool(profile.get("places") or profile.get("cities"))
+    if step == "direction":
+        return bool(directions_of(profile))
+    if step == "role":
+        return bool(profile.get("roles"))
     return False
 
 
+def migrate(profile: dict) -> dict:
+    """Профили, заполненные до появления регионов, хранят место двумя старыми
+    полями: places («города России» / «за рубежом») и cities — списком городов
+    словами. Переносим их в корзины регионов, иначе выбор молча перестал бы
+    действовать и человеку поехали бы вакансии со всей страны.
+
+    Конкретный город корзиной не заменить: у того, кто выбрал Петербург,
+    подборка станет шире. Это цена отказа от ввода городов руками.
+    """
+    if profile.get("regions"):
+        return profile
+    if "places" not in profile and "cities" not in profile:
+        return profile
+
+    regions: list[str] = []
+    for place in profile.pop("places", None) or []:
+        value = "ru" if place == "russia" else "abroad"
+        if value not in regions:
+            regions.append(value)
+    for city in profile.pop("cities", None) or []:
+        value = geo.where(city)
+        if value and value not in regions:
+            regions.append(value)
+    profile["regions"] = regions
+    return profile
+
+
+def directions_of(profile: dict) -> list[str]:
+    """Направления, которых человек коснулся: хранится всё в ролях,
+    отдельного поля нет — иначе они разъезжаются между собой."""
+    seen = []
+    for role in profile.get("roles") or []:
+        direction = role.partition(".")[0]
+        if direction not in seen:
+            seen.append(direction)
+    return seen
+
+
 def to_filters(profile: dict) -> dict:
-    """Профиль в том виде, в каком его ждёт core.check — плюс общий фильтр роли."""
-    config = json.loads((ROOT / "config.json").read_text("utf-8"))
-    role = config.get("role", {})
+    """Профиль в том виде, в каком его ждёт core.check.
+
+    Общего фильтра роли здесь больше нет: что считать вакансией профессии —
+    свойство самой профессии (roles.json), а не одна настройка на всех.
+    Глобальные стоп-слова тоже ушли туда: пока они были общими, «графический
+    дизайн» резался у всех и роль «графический дизайнер» была невыразима.
+    """
     formats = profile.get("formats") or []
     # Пустой список форматов значит «пропущено», поэтому разрешаем все три.
     chosen = {name: (not formats or name in formats) for name, _ in FORMATS}
@@ -109,14 +159,11 @@ def to_filters(profile: dict) -> dict:
     return {
         "grades": profile.get("grades") or [],
         "roles": roles_of(profile),
-        "include_any": role.get("include_any", []),
-        "exclude_any": role.get("exclude_any", []),
         "salary_min": profile.get("salary_min"),
         "salary_max": profile.get("salary_max"),
         "work_formats": {
             **chosen,
-            "places": profile.get("places") or [],
-            "cities": profile.get("cities") or [],
+            "regions": profile.get("regions") or [],
         },
     }
 
@@ -126,9 +173,9 @@ def to_filters(profile: dict) -> dict:
 # --------------------------------------------------------------------------
 
 
-def _named(selected: list, options: list[tuple]) -> str:
+def _named(selected: list, options: list[tuple], empty: str = ANY) -> str:
     if not selected:
-        return ANY
+        return empty
     labels = [label for value, label in options if value in selected]
     return ", ".join(labels) if labels else ANY
 
@@ -149,46 +196,44 @@ def describe_salary(profile: dict) -> str:
         return f"от {_money(low)}"
     if high:
         return f"до {_money(high)}"
-    return ANY
+    return ANY_F
 
 
 def describe_formats(profile: dict) -> str:
     return _named(profile.get("formats") or [], FORMATS)
 
 
-def describe_cities(profile: dict) -> str:
-    if not needs_cities(profile):
+def describe_roles(profile: dict) -> str:
+    from finderjob import taxonomy
+
+    roles = profile.get("roles") or []
+    return ", ".join(taxonomy.label(r) for r in roles) if roles else "дизайн"
+
+
+def describe_regions(profile: dict) -> str:
+    if not needs_region(profile):
         return "не спрашиваем, ты выбрал только удалёнку"
-    parts = [label for value, label in PLACES if value in (profile.get("places") or [])]
-    parts += list(profile.get("cities") or [])
-    return ", ".join(parts) if parts else ANY
+    return _named(profile.get("regions") or [], REGIONS)
+
+
+def describe_sources(profile: dict) -> str:
+    from finderjob import taxonomy
+
+    keys = profile.get("sources") or []
+    if not keys:
+        return "все"
+    return ", ".join(taxonomy.sources().get(k, {}).get("label", k) for k in keys)
 
 
 def summary(profile: dict) -> str:
     return (
         "<b>Твои критерии</b>\n\n"
+        f"Профессии: {describe_roles(profile)}\n"
         f"Грейд: {describe_grades(profile)}\n"
         f"Зарплата: {describe_salary(profile)}\n"
         f"Формат работы: {describe_formats(profile)}\n"
-        f"Город: {describe_cities(profile)}"
+        f"Регион: {describe_regions(profile)}\n"
+        f"Источники: {describe_sources(profile)}"
     )
 
 
-# --------------------------------------------------------------------------
-# разбор того, что человек написал руками
-# --------------------------------------------------------------------------
-
-
-def parse_cities(text: str) -> list[str]:
-    """Список городов через запятую. Приводим написание к канону справочника,
-    чтобы «питер» и «Санкт-Петербург» не разъезжались."""
-    names = []
-    for chunk in text.replace(";", ",").split(","):
-        name = " ".join(chunk.split()).strip("-—.;:")
-        if not name or len(name) > 40:
-            continue
-        canonical = geo.canon(name)
-        pretty = "-".join(part[:1].upper() + part[1:] for part in canonical.split("-"))
-        if pretty not in names:
-            names.append(pretty)
-    return names[:10]

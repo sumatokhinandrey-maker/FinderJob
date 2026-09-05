@@ -63,35 +63,14 @@ def _open_step(user: dict, step: str, mode: str) -> None:
 
 
 def _typed(user: dict, text: str) -> None:
-    """Человек прислал вилку или список городов текстом."""
+    """Текстом больше не отвечают ни на один шаг: зарплата выбирается
+    кнопками-порогами, город заменён регионом. Кто-то мог застать старый
+    шаг открытым — просто возвращаем карточку мастера."""
     step = user["awaiting"]
-    profile = user["profile"]
-    note = ""
-
-    if step != "cities":
-        # Зарплату когда-то вводили текстом, теперь она выбирается кнопками.
-        # Кто-то мог застать старый шаг открытым — возвращаем его на карточку.
-        user["awaiting"] = None
-        store.save_user(user)
-        body, keyboard = wizard.render(step, profile, user.get("mode", "setup"))
-        _show(user, body, keyboard)
-        return
-
-    stats.track("city_typed")
-    names = prof.parse_cities(text)
-    if not names:
-        _show(user, wizard.BAD_CITIES, wizard.input_keyboard("cities"))
-        return
-    cities = profile.setdefault("cities", [])
-    for name in names:
-        if name not in cities:
-            cities.append(name)
-    note = "Записал: " + ", ".join(names)
-
     user["awaiting"] = None
     store.save_user(user)
-    body, keyboard = wizard.render(step, profile, user.get("mode", "setup"))
-    _show(user, note + "\n\n" + body, keyboard)
+    body, keyboard = wizard.render(step, user["profile"], user.get("mode", "setup"))
+    _show(user, body, keyboard)
 
 
 def _show(user: dict, body: str, keyboard: list) -> None:
@@ -167,7 +146,7 @@ def handle_callback(callback: dict) -> None:
         return
 
     user = _user(chat)
-    profile = user["profile"]
+    profile = prof.migrate(user["profile"])
     message_id = message.get("message_id")
     finished = False
     edited = False
@@ -188,12 +167,6 @@ def handle_callback(callback: dict) -> None:
         user["mode"] = "edit"
         user["step"] = data[3:]
         body, keyboard = wizard.render(user["step"], profile, "edit")
-
-    elif data.startswith("in:"):
-        step = data[3:]
-        user["awaiting"] = step
-        body = wizard.ASK_CITIES
-        keyboard = wizard.input_keyboard(step)
 
     elif data.startswith("ca:"):
         user["awaiting"] = None

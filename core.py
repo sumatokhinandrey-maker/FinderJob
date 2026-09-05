@@ -110,21 +110,16 @@ ENTRY_GRADES = {"intern", "junior"}
 
 
 def _place_allowed(vacancy: Vacancy, rules: dict) -> bool:
-    """Место подходит? Касается только гибрида и офиса — на удалёнку не влияет.
+    """Регион подходит? Касается только гибрида и офиса — на удалёнку не влияет.
 
-    Три источника ответа: корзина «города России», корзина «за рубежом»
-    и список конкретных городов. Пусто везде — шаг пропущен, подходит всё.
+    Три корзины: Россия, СНГ, зарубежные. Пусто — шаг пропущен, подходит всё.
     """
-    places = rules.get("places") or []
-    cities = rules.get("cities") or []
-    if not places and not cities:
+    regions = rules.get("regions") or []
+    if not regions:
         return True
 
     if not vacancy.city:
         # Город не указан вовсе — не угадываем, решать будет человек.
-        return True
-
-    if any(geo.same(vacancy.city, name) for name in cities):
         return True
 
     where = geo.where(vacancy.city)
@@ -132,7 +127,7 @@ def _place_allowed(vacancy: Vacancy, rules: dict) -> bool:
         # Незнакомый город: в какой он корзине, мы не знаем, поэтому
         # не отсекаем. Лучше лишняя строка, чем потерянная вакансия.
         return True
-    return ("russia" if where == "ru" else "abroad") in places
+    return where in regions
 
 
 def check(vacancy: Vacancy, profile: dict) -> str | None:
@@ -155,17 +150,8 @@ def check(vacancy: Vacancy, profile: dict) -> str | None:
     # дизайн» больше не глобальное стоп-слово, а признак другой роли:
     # кто выбрал графдизайн — тот его и получит.
     roles = profile.get("roles") or []
-    if roles:
-        if not taxonomy.match(vacancy.title, roles):
-            return "role"
-    else:
-        include = [w.lower() for w in profile.get("include_any", [])]
-        if include and not any(word in vacancy.title.lower() for word in include):
-            return "role"
-
-    for word in profile.get("exclude_any", []):
-        if re.search(rf"\b{re.escape(word.lower())}", text):
-            return "stop"
+    if roles and not taxonomy.match(vacancy.title, roles):
+        return "role"
 
     formats = profile.get("work_formats", {})
     if vacancy.work_format == "remote" and not formats.get("remote", True):
@@ -391,6 +377,9 @@ def _grouped(vacancies: list[Vacancy], roles: list[str]) -> str:
         key = taxonomy.match(vacancy.title, roles) or "other"
         groups.setdefault(key, []).append(vacancy)
 
+    if len(groups) < 2:
+        return ""          # одна группа — разбивать не на что
+
     blocks = []
     for key in list(roles) + ["other"]:
         items = groups.get(key)
@@ -425,11 +414,13 @@ def build_digest(vacancies: list[Vacancy], held_back: int = 0,
         return header + "\nСегодня ничего нового по твоим фильтрам." + note
 
     header += f" · {len(vacancies)} " + _plural(len(vacancies))
-    body = (
-        _grouped(vacancies, roles)
-        if roles and len(roles) > 1
-        else "\n\n".join(_line(v) for v in vacancies)
-    )
+    # Заголовки групп нужны, только когда групп правда несколько: над
+    # единственной пачкой заголовок — лишний шум.
+    body = ""
+    if roles and len(roles) > 1:
+        body = _grouped(vacancies, roles)
+    if not body:
+        body = "\n\n".join(_line(v) for v in vacancies)
     return header + "\n\n" + body + note
 
 

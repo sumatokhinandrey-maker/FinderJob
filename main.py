@@ -52,6 +52,7 @@ def load_env() -> None:
 def deliver(user: dict, vacancies: list, dry_run: bool) -> int:
     """Готовим и отправляем дайджест одному человеку. Возвращаем,
     сколько вакансий ему ушло."""
+    prof.migrate(user["profile"])
     filters = prof.to_filters(user["profile"])
     passed, rejected = core.apply_filters(vacancies, filters)
 
