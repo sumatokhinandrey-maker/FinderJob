@@ -1,0 +1,107 @@
+{
+  "_comment": "Куда идти за вакансиями каждой профессии. Дизайн был зашит не только в фильтре, но и в адресах: hirehi ходил в sitemap-vacancies-design.xml, careerspace в /collection/ux_ui, getmatch в product_design. Здесь эти адреса становятся данными. Ключ маршрута — направление (design) или конкретная роль (dev.frontend); код сначала ищет роль, потом направление. Пустой маршрут значит, что источник эту профессию не отдаёт, и ходить туда незачем.",
+  "sources": {
+    "hirehi": {
+      "label": "hirehi",
+      "status": "connected",
+      "route_kind": "sitemap",
+      "routes": {
+        "design": ["sitemap-vacancies-design.xml"],
+        "dev": ["sitemap-vacancies-development.xml", "sitemap-vacancies-qa.xml"],
+        "content": ["sitemap-vacancies-marketing.xml"],
+        "product": ["sitemap-vacancies-analytics.xml", "sitemap-vacancies-management.xml"]
+      }
+    },
+    "hh": {
+      "label": "hh.ru",
+      "status": "connected",
+      "route_kind": "query",
+      "routes": {
+        "design.product": ["продуктовый дизайнер", "ux/ui дизайнер", "дизайнер интерфейсов", "product designer", "ui дизайнер"],
+        "design.web": ["веб-дизайнер"],
+        "design.graphic": ["графический дизайнер"],
+        "design.motion": ["моушн дизайнер"],
+        "content.copywriter": ["копирайтер"],
+        "content.editor": ["редактор"],
+        "content.smm": ["smm-специалист", "smm-менеджер"],
+        "content.maker": ["контент-менеджер", "контент-мейкер"],
+        "dev.frontend": ["frontend разработчик", "react разработчик"],
+        "dev.backend": ["backend разработчик", "python разработчик"],
+        "dev.mobile": ["ios разработчик", "android разработчик"],
+        "dev.fullstack": ["fullstack разработчик"],
+        "dev.qa": ["qa инженер", "тестировщик"],
+        "product.manager": ["продакт-менеджер"],
+        "product.analyst": ["продуктовый аналитик", "аналитик данных"],
+        "product.project": ["проджект-менеджер"]
+      }
+    },
+    "habr": {
+      "label": "Хабр Карьера",
+      "status": "connected",
+      "route_kind": "rubric",
+      "routes": {
+        "design": ["dizajner", "ui_ux_designer", "ux_designer", "veb_dizajner", "digital_dizajner", "razrabotchik_interfejsov"],
+        "dev.frontend": ["frontend_razrabotchik"],
+        "dev.backend": ["backend_razrabotchik"],
+        "content.copywriter": ["kopirajter"],
+        "content.maker": ["kontent_menedzher"],
+        "content.smm": ["marketolog"],
+        "product.manager": ["menedzher_po_produktu"],
+        "product.analyst": ["analitik"]
+      }
+    },
+    "getmatch": {
+      "label": "getmatch",
+      "status": "connected",
+      "route_kind": "specialization",
+      "routes": {
+        "design.product": ["product_design"],
+        "content.copywriter": ["ux_writer", "tech_writer"],
+        "content.smm": ["marketing"],
+        "dev.frontend": ["js_frontend", "typescript"],
+        "dev.backend": ["python", "java_scala", "golang", "php", "js_backend", "c_sharp", "ruby"],
+        "dev.mobile": ["ios", "android", "kotlin", "cross_platform_flutter_react_native"],
+        "dev.fullstack": ["fullstack"],
+        "dev.qa": ["qa_auto", "qa_manual"],
+        "product.manager": ["product_management"],
+        "product.analyst": ["product_analyst", "data_analyst_bi", "system_analyst", "business_analyst"],
+        "product.project": ["project_management"]
+      }
+    },
+    "careerspace": {
+      "label": "careerspace",
+      "status": "connected",
+      "route_kind": "collection",
+      "routes": {
+        "design.product": ["ux_ui"],
+        "design.graphic": ["graphic_design"]
+      }
+    },
+    "designer": {
+      "label": "designer.ru",
+      "status": "connected",
+      "route_kind": "board",
+      "routes": {
+        "design": ["all"]
+      }
+    },
+    "companies": {
+      "label": "Сайты компаний",
+      "status": "connected",
+      "route_kind": "all",
+      "_note": "Яндекс, VK, Т-Банк, МТС, Магнит отдают все свои вакансии разом — направление отбирается фильтром роли, отдельных адресов нет.",
+      "routes": {
+        "design": ["*"], "dev": ["*"], "content": ["*"], "product": ["*"]
+      }
+    },
+    "telegram": {
+      "label": "Telegram",
+      "status": "planned",
+      "route_kind": "channel",
+      "_note": "Читается через веб-ленту t.me/s/, без аккаунта и ключей. Каналы под разработку и контент ещё не найдены.",
+      "routes": {
+        "design": ["designhunters", "designoffers"]
+      }
+    }
+  }
+}

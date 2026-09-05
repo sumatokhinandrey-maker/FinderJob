@@ -1,0 +1,282 @@
+{
+  "_comment": "Что бот считает вакансией той или иной профессии. Раньше это жило в config.json одним общим фильтром на всех и означало «дизайн». Теперь роль — выбор человека, а правила у каждой роли свои. include сверяется с ЗАГОЛОВКОМ вакансии: описание рекрутёра упоминает и UI, и копирайтинг, и фронтенд мимоходом.",
+  "directions": {
+    "design": {
+      "label": "Дизайн",
+      "roles": {
+        "product": {
+          "label": "Продуктовый",
+          "include": [
+            "ux",
+            "ui",
+            "продуктовый дизайнер",
+            "product designer",
+            "дизайнер продукт",
+            "продуктового дизайн",
+            "дизайнер интерфейсов",
+            "интерфейс",
+            "design team lead",
+            "staff designer",
+            "дизайн-систем",
+            "дизайнер приложен",
+            "дизайнер мобильн"
+          ],
+          "exclude": [
+            "график",
+            "graphic",
+            "моушн",
+            "motion",
+            "3d",
+            "интерьер",
+            "мебел"
+          ]
+        },
+        "graphic": {
+          "label": "Графический",
+          "include": [
+            "графи",
+            "graphic",
+            "визуальный дизайн",
+            "visual designer",
+            "полиграф",
+            "брендинг",
+            "branding",
+            "айдентик",
+            "упаковк",
+            "коммуникац",
+            "communication designer",
+            "иллюстра",
+            "креативн",
+            "презентац"
+          ],
+          "exclude": [
+            "моушн",
+            "моушен",
+            "motion",
+            "3d"
+          ]
+        },
+        "web": {
+          "label": "Веб",
+          "include": [
+            "веб-дизайн",
+            "веб дизайн",
+            "web дизайн",
+            "web-дизайн",
+            "web designer",
+            "лендинг"
+          ],
+          "exclude": []
+        },
+        "motion": {
+          "label": "Моушн",
+          "include": [
+            "моушн",
+            "моушен",
+            "motion",
+            "анимат",
+            "animator",
+            "3d",
+            "видеомонтаж"
+          ],
+          "exclude": []
+        },
+        "game": {
+          "label": "Гейм",
+          "include": [
+            "гейм",
+            "game design",
+            "game дизайн",
+            "game designer",
+            "level design",
+            "левел-дизайн",
+            "нарратив"
+          ],
+          "exclude": []
+        },
+        "art": {
+          "label": "Арт-директор",
+          "include": [
+            "арт-директор",
+            "art director",
+            "креативный директор",
+            "creative director"
+          ],
+          "exclude": []
+        }
+      }
+    },
+    "content": {
+      "label": "Контент",
+      "roles": {
+        "copywriter": {
+          "label": "Копирайтер",
+          "include": [
+            "копирайт",
+            "copywriter",
+            "автор текстов",
+            "ux writer",
+            "ux-редактор"
+          ],
+          "exclude": []
+        },
+        "editor": {
+          "label": "Редактор",
+          "include": [
+            "редактор",
+            "editor",
+            "корректор"
+          ],
+          "exclude": [
+            "видеоредактор",
+            "video editor"
+          ]
+        },
+        "smm": {
+          "label": "SMM",
+          "include": [
+            "smm",
+            "смм",
+            "соцсет",
+            "социальных сетей",
+            "комьюнити",
+            "community manager"
+          ],
+          "exclude": []
+        },
+        "maker": {
+          "label": "Контент-мейкер",
+          "include": [
+            "контент",
+            "content",
+            "продюсер контента"
+          ],
+          "exclude": [
+            "контентная аналитика"
+          ]
+        },
+        "marketing": {
+          "label": "Маркетолог",
+          "include": [
+            "маркетолог",
+            "маркетинг",
+            "marketing",
+            "performance-",
+            "трафик"
+          ],
+          "exclude": []
+        }
+      }
+    },
+    "dev": {
+      "label": "Разработка",
+      "roles": {
+        "frontend": {
+          "label": "Фронтенд",
+          "include": [
+            "frontend",
+            "фронтенд",
+            "фронтэнд",
+            "react",
+            "vue",
+            "angular",
+            "javascript",
+            "typescript",
+            "верстальщик"
+          ],
+          "exclude": []
+        },
+        "backend": {
+          "label": "Бэкенд",
+          "include": [
+            "backend",
+            "бэкенд",
+            "бекенд",
+            "python",
+            "java",
+            "golang",
+            "php",
+            "node.js",
+            "c#",
+            ".net",
+            "ruby"
+          ],
+          "exclude": []
+        },
+        "mobile": {
+          "label": "Мобильная",
+          "include": [
+            "ios",
+            "android",
+            "flutter",
+            "react native",
+            "kotlin",
+            "swift",
+            "мобильн"
+          ],
+          "exclude": []
+        },
+        "fullstack": {
+          "label": "Фулстек",
+          "include": [
+            "fullstack",
+            "full-stack",
+            "фулстек",
+            "фуллстек"
+          ],
+          "exclude": []
+        },
+        "qa": {
+          "label": "Тестирование",
+          "include": [
+            "qa",
+            "тестировщик",
+            "test engineer",
+            "автотест",
+            "automation qa",
+            "тестирован"
+          ],
+          "exclude": []
+        }
+      }
+    },
+    "product": {
+      "label": "Продукт",
+      "roles": {
+        "manager": {
+          "label": "Продакт",
+          "include": [
+            "продакт",
+            "product manager",
+            "product owner",
+            "менеджер продукта",
+            "менеджер по продукту"
+          ],
+          "exclude": []
+        },
+        "analyst": {
+          "label": "Аналитик",
+          "include": [
+            "аналитик",
+            "analyst",
+            "analytics",
+            "data scientist",
+            "bi-"
+          ],
+          "exclude": []
+        },
+        "project": {
+          "label": "Проджект",
+          "include": [
+            "проджект",
+            "project manager",
+            "руководитель проект",
+            "delivery manager",
+            "project"
+          ],
+          "exclude": []
+        }
+      }
+    }
+  }
+}
