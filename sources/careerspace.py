@@ -26,6 +26,7 @@ import urllib.request
 from html import unescape
 
 from core import Vacancy
+from finderjob import geo
 
 BASE = "https://careerspace.app"
 DEFAULT_ROUTES = ["ux_ui"]
@@ -122,7 +123,10 @@ def parse_vacancy(url: str, parts: list[str], html: str) -> Vacancy | None:
             work_format = FORMATS[low]
         elif _SALARY_RE.search(part):
             continue  # вилка у них оценочная, не берём
-        elif city is None:
+        elif city is None and geo.where(part):
+            # Город узнаём по справочнику, а не берём первое непонятное:
+            # в карточку иногда попадает тег специализации, и вакансия ПИК
+            # приезжала с городом «UI дизайнер».
             city = part
 
     return Vacancy(
