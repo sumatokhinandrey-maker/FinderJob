@@ -8,6 +8,7 @@ HTTP-запросом. Значит, и вебхук на Vercel, и ежедн�
 from __future__ import annotations
 
 import json
+import time
 import os
 import urllib.error
 import urllib.request
@@ -50,6 +51,10 @@ class StoreError(RuntimeError):
     pass
 
 
+TIMEOUT_SEC = 10
+TRIES = 3
+
+
 def _command(*args: object) -> object:
     URL, TOKEN = _credentials()
     if not URL or not TOKEN:
@@ -73,13 +78,33 @@ def _command(*args: object) -> object:
             "Content-Type": "application/json",
         },
     )
-    try:
-        with urllib.request.urlopen(request, timeout=15) as response:
-            body = json.loads(response.read())
-    except urllib.error.HTTPError as exc:
-        raise StoreError(
-            f"Хранилище вернуло {exc.code}: {exc.read().decode('utf-8', 'replace')}"
-        ) from exc
+    # Upstash отвечает не всегда с первого раза: рукопожатие TLS иногда висит
+    # до таймаута. Без повторов одна такая заминка роняла рассылку целиком —
+    # и не в начале, а на середине списка подписчиков. Все наши команды
+    # (GET, SET, SMEMBERS, SADD) идемпотентны, повторять их безопасно.
+    body = None
+    for attempt in range(1, TRIES + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=TIMEOUT_SEC) as response:
+                body = json.loads(response.read())
+            break
+        except urllib.error.HTTPError as exc:
+            # 5xx — сторона хранилища, её стоит переспросить. 4xx это наша
+            # ошибка (токен, синтаксис) — повторять бессмысленно.
+            if exc.code >= 500 and attempt < TRIES:
+                time.sleep(attempt)
+                continue
+            raise StoreError(
+                f"Хранилище вернуло {exc.code}: {exc.read().decode('utf-8', 'replace')}"
+            ) from exc
+        except OSError as exc:
+            # URLError, обрыв соединения и таймаут рукопожатия — все они OSError.
+            if attempt < TRIES:
+                time.sleep(attempt)
+                continue
+            raise StoreError(
+                f"Хранилище не ответило за {TRIES} попытки: {exc}"
+            ) from exc
     if "error" in body:
         raise StoreError(body["error"])
     return body.get("result")
