@@ -88,6 +88,26 @@ def _rows(buttons: list[dict], per_row: int = 2) -> list[list[dict]]:
     return [buttons[i : i + per_row] for i in range(0, len(buttons), per_row)]
 
 
+def _all_sources() -> list[str]:
+    return [k for k, v in taxonomy.sources().items() if v.get("status") == "connected"]
+
+
+def _toggle_from_all(profile: dict, field: str, value: str, everything: list[str]) -> None:
+    """Снять один пункт там, где по умолчанию включено всё.
+
+    Пустое поле значит «подходит всё», поэтому первое же снятие надо
+    развернуть в полный список — иначе нажатие на «Россию» оставило бы
+    ровно Россию вместо того, чтобы её убрать.
+    """
+    current = profile.get(field) or list(everything)
+    if value in current:
+        current.remove(value)
+    else:
+        current.append(value)
+    # Сняли всё до последнего — это то же самое, что «подходит любой».
+    profile[field] = [] if not current else current
+
+
 # --------------------------------------------------------------------------
 # переходы между шагами
 # --------------------------------------------------------------------------
@@ -158,7 +178,11 @@ def keyboard(step: str, profile: dict, mode: str) -> list[list[dict]]:
         return _rows(buttons) + _tail(step, profile, mode)
 
     if step == "region":
-        chosen = profile.get("regions") or []
+        # Пустой список означает «подходит любой», и показывать его пустым
+        # нечестно: человек видит ноль галочек там, где на деле включено всё.
+        # Рисуем все отмеченными — снимать лишнее понятнее, чем набирать
+        # с нуля.
+        chosen = profile.get("regions") or [value for value, _ in prof.REGIONS]
         buttons = [
             _button(f"{CHECK if value in chosen else ''}{label}", f"trg:{value}")
             for value, label in prof.REGIONS
@@ -169,7 +193,7 @@ def keyboard(step: str, profile: dict, mode: str) -> list[list[dict]]:
         # Рядом с каждой площадкой — что она даст именно по твоим профессиям.
         # Без этого можно выбрать фронтенд вместе с designer.ru и ждать
         # вакансий, которых оттуда не будет никогда.
-        chosen = profile.get("sources") or []
+        chosen = profile.get("sources") or _all_sources()
         fits = taxonomy.coverage(prof.roles_of(profile))
         buttons = []
         for key, body in taxonomy.sources().items():
@@ -297,9 +321,9 @@ def apply(data: str, user: dict) -> None:
                 f"{direction}.{role}" for role in taxonomy.roles()[direction]["roles"]
             )
     elif data.startswith("trg:"):
-        _toggle(profile.setdefault("regions", []), data[4:])
+        _toggle_from_all(profile, "regions", data[4:], [v for v, _ in prof.REGIONS])
     elif data.startswith("tsrc:"):
-        _toggle(profile.setdefault("sources", []), data[5:])
+        _toggle_from_all(profile, "sources", data[5:], _all_sources())
     elif data.startswith("tr:"):
         _toggle(profile.setdefault("roles", []), data[3:])
     elif data.startswith("tg:"):

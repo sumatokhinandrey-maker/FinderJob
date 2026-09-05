@@ -159,6 +159,7 @@ def to_filters(profile: dict) -> dict:
     return {
         "grades": profile.get("grades") or [],
         "roles": roles_of(profile),
+        "sources": profile.get("sources") or [],
         "salary_min": profile.get("salary_min"),
         "salary_max": profile.get("salary_max"),
         "work_formats": {

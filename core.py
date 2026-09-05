@@ -98,6 +98,7 @@ REASONS = {
     "grade": "грейд",
     "grade_unknown": "грейд не указан",
     "role": "не та роль",
+    "source": "другая площадка",
     "stop": "стоп-слово",
     "format": "формат работы",
     "salary": "деньги",
@@ -107,6 +108,11 @@ REASONS = {
 # Грейды «входа в профессию»: для них действует обратное правило про
 # неизвестный грейд — см. check().
 ENTRY_GRADES = {"intern", "junior"}
+
+
+# Карьерные сайты компаний: отклик идёт напрямую работодателю, без посредников
+# и регистраций, поэтому при склейке дублей они выигрывают у всех.
+COMPANY_SITES = {"yandex", "magnit", "mts", "tbank", "rwb", "vk"}
 
 
 def _place_allowed(vacancy: Vacancy, rules: dict) -> bool:
@@ -152,6 +158,19 @@ def check(vacancy: Vacancy, profile: dict) -> str | None:
     roles = profile.get("roles") or []
     if roles and not taxonomy.match(vacancy.title, roles):
         return "role"
+
+    # Пустой список площадок значит «подходят все». Обход при этом остаётся
+    # общим: вакансии собираются один раз на всех подписчиков, а выбор
+    # источника — это то, что человек готов видеть у себя в подборке.
+    sources = profile.get("sources") or []
+    if sources:
+        # Карьерные сайты выбираются одной кнопкой «Сайты компаний»,
+        # а в вакансии стоит конкретная площадка: yandex, vk, mts.
+        allowed = set(sources)
+        if "companies" in allowed:
+            allowed |= COMPANY_SITES
+        if vacancy.source not in allowed:
+            return "source"
 
     formats = profile.get("work_formats", {})
     if vacancy.work_format == "remote" and not formats.get("remote", True):
@@ -330,9 +349,6 @@ SOURCE_LABEL = {
     "rwb": "RWB",
 }
 
-# Карьерные сайты компаний: отклик идёт напрямую работодателю, без посредников
-# и регистраций, поэтому при склейке дублей они выигрывают у всех.
-COMPANY_SITES = {"yandex", "magnit", "mts", "tbank", "rwb", "vk"}
 
 FORMAT_LABEL = {
     "remote": "удалёнка",
