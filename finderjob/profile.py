@@ -108,6 +108,7 @@ def to_filters(profile: dict) -> dict:
 
     return {
         "grades": profile.get("grades") or [],
+        "roles": roles_of(profile),
         "include_any": role.get("include_any", []),
         "exclude_any": role.get("exclude_any", []),
         "salary_min": profile.get("salary_min"),

@@ -58,7 +58,9 @@ def deliver(user: dict, vacancies: list, dry_run: bool) -> int:
     seen = user.get("seen") or {}
     fresh = core.only_new(passed, seen)
 
-    digest = core.build_digest(fresh, rejected.get("grade_unknown", 0))
+    digest = core.build_digest(
+        fresh, rejected.get("grade_unknown", 0), prof.roles_of(user["profile"])
+    )
     label = user.get("username") or user["chat_id"]
     breakdown = ", ".join(
         f"{core.REASONS.get(k, k)} {v}" for k, v in sorted(rejected.items())

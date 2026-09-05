@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass, replace
 from datetime import date, timedelta
 from pathlib import Path
 
-from finderjob import geo
+from finderjob import geo, taxonomy
 
 ROOT = Path(__file__).parent
 
@@ -147,13 +147,21 @@ def check(vacancy: Vacancy, profile: dict) -> str | None:
             if not set(vacancy.grade.split(",")) & set(grades):
                 return "grade"
 
-    # Сверяем только с заголовком, не со всем текстом: описание рекрутёра,
-    # фронтендера или геймдев-программиста тоже может упомянуть «UI»/«UX»/
-    # «интерфейс» мимоходом, и по всему тексту (haystack) такая вакансия
-    # ложно проходила бы фильтр роли. Заголовок источники называют прямо.
-    include = [w.lower() for w in profile.get("include_any", [])]
-    if include and not any(word in vacancy.title.lower() for word in include):
-        return "role"
+    # Роль ищем по заголовку, а не по всему тексту: описание рекрутёра,
+    # фронтендера или геймдев-программиста тоже упоминает «UI»/«UX»/
+    # «интерфейс» мимоходом, и по haystack такая вакансия ложно проходила.
+    #
+    # У каждой профессии свои правила (roles.json), поэтому «графический
+    # дизайн» больше не глобальное стоп-слово, а признак другой роли:
+    # кто выбрал графдизайн — тот его и получит.
+    roles = profile.get("roles") or []
+    if roles:
+        if not taxonomy.match(vacancy.title, roles):
+            return "role"
+    else:
+        include = [w.lower() for w in profile.get("include_any", [])]
+        if include and not any(word in vacancy.title.lower() for word in include):
+            return "role"
 
     for word in profile.get("exclude_any", []):
         if re.search(rf"\b{re.escape(word.lower())}", text):
@@ -371,10 +379,36 @@ def _line(vacancy: Vacancy) -> str:
     return f"▸ <b>{_escape(vacancy.title)}</b>\n   {line} · {link}"
 
 
-def build_digest(vacancies: list[Vacancy], held_back: int = 0) -> str:
+def _grouped(vacancies: list[Vacancy], roles: list[str]) -> str:
+    """Вакансии по профессиям, в порядке, в каком человек их выбирал.
+
+    Когда ролей несколько, сплошной список читается как каша: фронтенд
+    вперемешку с графдизайном. Заголовок группы отвечает на вопрос
+    «почему эта вакансия здесь».
+    """
+    groups: dict[str, list[Vacancy]] = {}
+    for vacancy in vacancies:
+        key = taxonomy.match(vacancy.title, roles) or "other"
+        groups.setdefault(key, []).append(vacancy)
+
+    blocks = []
+    for key in list(roles) + ["other"]:
+        items = groups.get(key)
+        if not items:
+            continue
+        title = taxonomy.label(key) if key != "other" else "Прочее"
+        blocks.append(f"<b>{title}</b>\n\n" + "\n\n".join(_line(v) for v in items))
+    return "\n\n".join(blocks)
+
+
+def build_digest(vacancies: list[Vacancy], held_back: int = 0,
+                 roles: list[str] | None = None) -> str:
     """held_back — сколько вакансий скрыто из-за неназванного грейда.
     Молчать об этом нельзя: у тех, кто ищет стажировку, подборка выходит
-    короткой, и без объяснения это неотличимо от поломки бота."""
+    короткой, и без объяснения это неотличимо от поломки бота.
+
+    roles — профессии человека: если их больше одной, подборка разбивается
+    на группы по профессиям."""
     today = date.today()
     header = f"<b>Дайджест {today.day} {MONTHS[today.month - 1]}</b>"
 
@@ -391,7 +425,12 @@ def build_digest(vacancies: list[Vacancy], held_back: int = 0) -> str:
         return header + "\nСегодня ничего нового по твоим фильтрам." + note
 
     header += f" · {len(vacancies)} " + _plural(len(vacancies))
-    return header + "\n\n" + "\n\n".join(_line(v) for v in vacancies) + note
+    body = (
+        _grouped(vacancies, roles)
+        if roles and len(roles) > 1
+        else "\n\n".join(_line(v) for v in vacancies)
+    )
+    return header + "\n\n" + body + note
 
 
 def _plural_hidden(n: int) -> str:
