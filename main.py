@@ -29,7 +29,7 @@ import core  # noqa: E402
 from finderjob import profile as prof  # noqa: E402
 from finderjob import stats, store, taxonomy, tg  # noqa: E402
 from sources import (careerspace, companies, designer, getmatch,  # noqa: E402
-                     habr, hh, hirehi)
+                     habr, hh, hirehi, telegram)
 
 
 def load_env() -> None:
@@ -147,7 +147,8 @@ def main() -> int:
                               ("careerspace", "careerspace", careerspace),
                               ("hh", "hh", hh), ("getmatch", "getmatch", getmatch),
                               ("designer.ru", "designer", designer),
-                              ("карьерные сайты", "companies", companies)):
+                              ("карьерные сайты", "companies", companies),
+                              ("telegram", "telegram", telegram)):
         own = windows.get(key)
         start = (date.today() - timedelta(days=own)).isoformat() if own else since
         plan = routes.get(key)

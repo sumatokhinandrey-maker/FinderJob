@@ -230,6 +230,51 @@ def vk() -> list[Vacancy]:
     return out
 
 
+# У SberDevices не лента вакансий, а тринадцать постоянных страниц-направлений:
+# «UX/UI-дизайнер», «Python-разработчик» и так далее. Это описания ролей,
+# а не объявления: ни даты публикации, ни зарплаты, ни города. Поэтому новизну
+# определяет только память о показанном, а фильтр места и денег их пропускает.
+# Данные лежат чистым JSON в __NEXT_DATA__ — парсить разметку не нужно.
+SBER_STREAMS = [
+    "UX&UI", "JS", "PO", "python", "Go", "ML", "IOS", "QA", "qaauto",
+    "DevOps", "\u0410\u0434\u043c\u0438\u043d\u0438\u0441\u0442\u0440\u0430\u0442\u043e\u0440  IT",
+    "\u043f\u0440\u043e\u0435\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435",
+    "Communication Lead",
+]
+
+_NEXT_RE = re.compile(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', re.S)
+
+
+def sberdevices() -> list[Vacancy]:
+    """Тринадцать направлений найма SberDevices."""
+    out = []
+    for stream in SBER_STREAMS:
+        url = "https://sberdevices.ru/career/" + urllib.parse.quote(stream) + "/"
+        try:
+            html = _fetch(url)
+        except Exception as exc:
+            print(f"  ! sberdevices {stream}: {str(exc)[:60]}")
+            continue
+        found = _NEXT_RE.search(html)
+        if not found:
+            continue
+        try:
+            data = json.loads(found.group(1))["props"]["pageProps"]["stream"]
+        except (json.JSONDecodeError, KeyError, TypeError):
+            continue
+        title = data.get("title")
+        if not title:
+            continue
+        # Навыки лежат в subline, обязанности и требования — списками через «;».
+        parts = [data.get("subline"), data.get("duties"), data.get("requirements")]
+        out.append(_make(
+            "SberDevices", "sberdevices", data.get("id"), title, url,
+            description=" ".join(p.replace(";", ". ") for p in parts if p),
+        ))
+        time.sleep(DELAY_SEC)
+    return out
+
+
 ADAPTERS = {
     "yandex": yandex,
     "magnit": magnit,
@@ -237,6 +282,7 @@ ADAPTERS = {
     "tbank": tbank,
     "rwb": rwb,
     "vk": vk,
+    "sberdevices": sberdevices,
 }
 
 

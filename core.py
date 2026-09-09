@@ -112,7 +112,7 @@ ENTRY_GRADES = {"intern", "junior"}
 
 # Карьерные сайты компаний: отклик идёт напрямую работодателю, без посредников
 # и регистраций, поэтому при склейке дублей они выигрывают у всех.
-COMPANY_SITES = {"yandex", "magnit", "mts", "tbank", "rwb", "vk"}
+COMPANY_SITES = {"yandex", "magnit", "mts", "tbank", "rwb", "vk", "sberdevices"}
 
 
 def _place_allowed(vacancy: Vacancy, rules: dict) -> bool:
@@ -264,13 +264,14 @@ def _fingerprint(vacancy: Vacancy) -> tuple:
 # данных ведём на другую площадку.
 OPENNESS = {
     # Сайт самой компании — лучшее, куда можно привести: отклик напрямую.
-    **{key: 0 for key in ("yandex", "magnit", "mts", "tbank", "rwb", "vk")},
+    **{key: 0 for key in ("yandex", "magnit", "mts", "tbank", "rwb", "vk", "sberdevices")},
     "hh": 1,
     "habr": 1,
     "careerspace": 1,
     "getmatch": 1,
     "designer": 1,
     "hirehi": 2,
+    "telegram": 1,
 }
 
 
@@ -347,6 +348,8 @@ SOURCE_LABEL = {
     "mts": "МТС",
     "magnit": "Магнит",
     "rwb": "RWB",
+    "sberdevices": "SberDevices",
+    "telegram": "Telegram",
 }
 
 
