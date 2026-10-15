@@ -42,7 +42,14 @@ MIN_MENTIONS = 3
 # аккаунтами с шаблонной вакансией «Senior Marketer (Sample)». Такие доски
 # маленькие и полны образцов — их на ручную проверку или сразу мимо.
 MIN_JOBS = 3
-_SAMPLE = re.compile(r"\b(sample|demo|test|example|template)\b|\(sample\)", re.I)
+# Только явные образцы: «(Sample)» в скобках или заголовок целиком из слова
+# «test»/«demo». Слово test внутри заголовка — это тестировщики («Software
+# Development Engineer In Test»), и первая версия правила ошибочно отбросила
+# из-за него Bybit со 159 настоящими вакансиями.
+_SAMPLE = re.compile(
+    r"\((sample|demo|example|template)\)|^\s*(test|demo|sample)(\s+(job|vacancy|position))?\s*$",
+    re.I,
+)
 
 BOARDS = {
     "greenhouse": "https://boards-api.greenhouse.io/v1/boards/{s}",
@@ -131,12 +138,41 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Поиск досок компаний на публичных ATS")
     parser.add_argument("--limit", type=int, default=0, help="сколько компаний проверить")
     parser.add_argument("--dry-run", action="store_true", help="не записывать реестр")
+    parser.add_argument("--recheck", metavar="STATUS",
+                        help="перепроверить записи с этим статусом по текущим правилам")
     args = parser.parse_args()
 
     from main import load_env
     load_env()
 
     registry = json.loads(REGISTRY.read_text("utf-8"))
+
+    if args.recheck:
+        # Правила сверки меняются — уже записанное надо уметь перепроверить,
+        # а не только искать новое.
+        changed = 0
+        for entry in registry["companies"]:
+            if entry.get("status") != args.recheck:
+                continue
+            data = _get(BOARDS[entry["platform"]].format(s=entry["slug"]))
+            time.sleep(PAUSE_SEC)
+            if not data:
+                print(f"  ? {entry['name']}: доска не ответила, оставляю как есть")
+                continue
+            if isinstance(data, dict):
+                data["_slug"] = entry["slug"]
+            total, org, text, titles = inspect(entry["platform"], data)
+            status, why = verdict(entry["name"], org, text, total, titles)
+            mark = "→" if status != entry["status"] else "="
+            print(f"  {entry['status']:8} {mark} {status:8} {entry['name'][:26]:26} "
+                  f"{entry['platform']}:{entry['slug']} — {total} | {why}")
+            if status != entry["status"]:
+                entry["status"], entry["confirmed_by"] = status, why
+                changed += 1
+        if changed and not args.dry_run:
+            REGISTRY.write_text(json.dumps(registry, ensure_ascii=False, indent=2) + "\n", "utf-8")
+        print(f"Изменено записей: {changed}")
+        return 0
     known = {(c["platform"], c["slug"]) for c in registry["companies"]}
     known_names = {c["name"].lower() for c in registry["companies"]}
 
