@@ -478,7 +478,10 @@
             "data scientist",
             "bi-"
           ],
-          "exclude": []
+          "exclude": [
+            "финансов",
+            "financial"
+          ]
         },
         "commercial": {
           "label": "Коммерческий директор",
@@ -486,6 +489,163 @@
             "коммерческий директор",
             "commercial director",
             "директор по развитию"
+          ],
+          "exclude": []
+        }
+      }
+    },
+    "sales": {
+      "label": "Продажи",
+      "roles": {
+        "sales": {
+          "label": "Продажи",
+          "include": [
+            "менеджер по продажам",
+            "sales manager",
+            "sales executive",
+            "руководитель отдела продаж",
+            "head of sales",
+            "sales representative",
+            "специалист по продажам",
+            "продавец-консультант",
+            "sales engineer",
+            "пресейл",
+            "presale",
+            "sales development",
+            "менеджер по работе с клиентами b2b"
+          ],
+          "exclude": []
+        },
+        "account": {
+          "label": "Аккаунт-менеджер",
+          "include": [
+            "аккаунт-менеджер",
+            "аккаунт менеджер",
+            "account manager",
+            "key account",
+            "клиентский менеджер",
+            "менеджер по работе с клиентами"
+          ],
+          "exclude": []
+        },
+        "bizdev": {
+          "label": "Развитие бизнеса",
+          "include": [
+            "business development",
+            "бизнес-девелопмент",
+            "менеджер по развитию бизнеса",
+            "партнёрств",
+            "партнерств",
+            "работе с партн"
+          ],
+          "exclude": []
+        },
+        "success": {
+          "label": "Customer Success",
+          "include": [
+            "customer success",
+            "менеджер по успеху клиент",
+            "клиентский сервис",
+            "customer support manager",
+            "менеджер по сопровождению клиент"
+          ],
+          "exclude": []
+        }
+      }
+    },
+    "hr": {
+      "label": "Рекрутинг и HR",
+      "roles": {
+        "recruiter": {
+          "label": "Рекрутер",
+          "include": [
+            "рекрутер",
+            "recruiter",
+            "talent acquisition",
+            "специалист по подбору",
+            "менеджер по подбору"
+          ],
+          "exclude": []
+        },
+        "sourcer": {
+          "label": "Сорсер",
+          "include": [
+            "сорсер",
+            "sourcer",
+            "sourcing specialist",
+            "ресёрчер",
+            "researcher по подбору"
+          ],
+          "exclude": [
+            "ux-ресёрчер",
+            "ux researcher"
+          ]
+        },
+        "hr": {
+          "label": "HR",
+          "include": [
+            "hr-менеджер",
+            "hr менеджер",
+            "hr generalist",
+            "hrbp",
+            "hr business partner",
+            "менеджер по персоналу",
+            "специалист по кадрам",
+            "кадровое делопроизводство",
+            "c&b",
+            "обучению и развитию",
+            "hr-директор",
+            "hr bp"
+          ],
+          "exclude": []
+        }
+      }
+    },
+    "finance": {
+      "label": "Финансы",
+      "roles": {
+        "analyst": {
+          "label": "Финансовый аналитик",
+          "include": [
+            "финансовый аналитик",
+            "financial analyst",
+            "инвестиционный аналитик",
+            "фин. аналитик"
+          ],
+          "exclude": []
+        },
+        "accounting": {
+          "label": "Бухгалтерия",
+          "include": [
+            "бухгалтер",
+            "accountant",
+            "главбух",
+            "специалист по налог",
+            "расчёту заработной платы",
+            "расчету заработной платы"
+          ],
+          "exclude": []
+        },
+        "controller": {
+          "label": "Финконтролер и планирование",
+          "include": [
+            "финансовый контролер",
+            "финансовый контроллер",
+            "financial controller",
+            "финансовому планированию",
+            "fp&a",
+            "казначейств",
+            "treasury"
+          ],
+          "exclude": []
+        },
+        "cfo": {
+          "label": "Финансовый директор",
+          "include": [
+            "финансовый директор",
+            "cfo",
+            "head of finance",
+            "руководитель финансового"
           ],
           "exclude": []
         }

@@ -20,6 +20,15 @@
         "product": [
           "sitemap-vacancies-analytics.xml",
           "sitemap-vacancies-management.xml"
+        ],
+        "sales": [
+          "sitemap-vacancies-sales.xml"
+        ],
+        "hr": [
+          "sitemap-vacancies-recruiting.xml"
+        ],
+        "finance": [
+          "sitemap-vacancies-finance.xml"
         ]
       }
     },
@@ -139,6 +148,42 @@
         ],
         "product.commercial": [
           "коммерческий директор"
+        ],
+        "sales.sales": [
+          "менеджер по продажам",
+          "sales manager"
+        ],
+        "sales.account": [
+          "аккаунт-менеджер"
+        ],
+        "sales.bizdev": [
+          "business development manager"
+        ],
+        "sales.success": [
+          "customer success manager"
+        ],
+        "hr.recruiter": [
+          "it-рекрутер",
+          "специалист по подбору персонала"
+        ],
+        "hr.sourcer": [
+          "сорсер"
+        ],
+        "hr.hr": [
+          "hr-менеджер",
+          "hr business partner"
+        ],
+        "finance.analyst": [
+          "финансовый аналитик"
+        ],
+        "finance.accounting": [
+          "бухгалтер"
+        ],
+        "finance.controller": [
+          "финансовый контролер"
+        ],
+        "finance.cfo": [
+          "финансовый директор"
         ]
       }
     },
@@ -259,6 +304,42 @@
         ],
         "product.commercial": [
           "коммерческий директор"
+        ],
+        "sales.sales": [
+          "менеджер по продажам",
+          "sales manager"
+        ],
+        "sales.account": [
+          "аккаунт-менеджер"
+        ],
+        "sales.bizdev": [
+          "business development manager"
+        ],
+        "sales.success": [
+          "customer success manager"
+        ],
+        "hr.recruiter": [
+          "it-рекрутер",
+          "специалист по подбору персонала"
+        ],
+        "hr.sourcer": [
+          "сорсер"
+        ],
+        "hr.hr": [
+          "hr-менеджер",
+          "hr business partner"
+        ],
+        "finance.analyst": [
+          "финансовый аналитик"
+        ],
+        "finance.accounting": [
+          "бухгалтер"
+        ],
+        "finance.controller": [
+          "финансовый контролер"
+        ],
+        "finance.cfo": [
+          "финансовый директор"
         ]
       }
     },
@@ -414,6 +495,15 @@
         ],
         "content": [
           "content"
+        ],
+        "sales": [
+          "sales"
+        ],
+        "hr": [
+          "hr"
+        ],
+        "finance": [
+          "finance"
         ]
       }
     },
@@ -470,6 +560,21 @@
         ],
         "content.growth": [
           "growth manager"
+        ],
+        "sales.sales": [
+          "sales manager"
+        ],
+        "sales.account": [
+          "account manager"
+        ],
+        "sales.success": [
+          "customer success manager"
+        ],
+        "hr.recruiter": [
+          "technical recruiter"
+        ],
+        "finance.analyst": [
+          "financial analyst"
         ]
       }
     },
