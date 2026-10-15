@@ -68,14 +68,17 @@ def deliver(user: dict, vacancies: list, dry_run: bool, cap: int = 0) -> int:
         fresh.sort(key=lambda v: v.posted_at, reverse=True)
         fresh, tail = fresh[:cap], len(fresh) - cap
 
-    digest = core.build_digest(
+    pages = core.build_pages(
         fresh, rejected.get("grade_unknown", 0), prof.roles_of(user["profile"])
     )
     if tail:
-        digest += (
+        # Приписку вешаем на последнюю страницу: она про то, что будет
+        # дальше, и читается в конце подборки, а не поверх неё.
+        pages[-1] += (
             f"\n\nЕщё {tail} " + core._plural(tail)
             + " — пришлю в следующие дни, чтобы не заваливать одним сообщением."
         )
+    digest = pages[0]
     label = user.get("username") or user["chat_id"]
     breakdown = ", ".join(
         f"{core.REASONS.get(k, k)} {v}" for k, v in sorted(rejected.items())
@@ -88,7 +91,8 @@ def deliver(user: dict, vacancies: list, dry_run: bool, cap: int = 0) -> int:
     if dry_run:
         return len(fresh)
 
-    tg.send(user["chat_id"], digest)
+    store.save_digest(user["chat_id"], pages)
+    tg.send(user["chat_id"], digest, core.digest_keyboard(0, len(pages)))
     stats.track("digest_sent")
     stats.track("vacancies_sent", len(fresh))
 

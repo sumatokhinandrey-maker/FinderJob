@@ -40,7 +40,9 @@ def first_digest(user: dict) -> None:
     seen = user.get("seen") or {}
     fresh = core.only_new(passed, seen)
 
-    tg.send(user["chat_id"], core.build_digest(fresh, rejected.get("grade_unknown", 0)))
+    pages = core.build_pages(fresh, rejected.get("grade_unknown", 0))
+    store.save_digest(user["chat_id"], pages)
+    tg.send(user["chat_id"], pages[0], core.digest_keyboard(0, len(pages)))
     stats.track("digest_sent")
     stats.track("vacancies_sent", len(fresh))
 
@@ -143,11 +145,35 @@ def handle_message(message: dict) -> None:
     tg.send(chat["id"], wizard.HELP)
 
 
+def _turn_page(chat_id: int, message_id: int | None, where: str) -> None:
+    """Перелистнуть дайджест. Страницы лежат в хранилище неделю; если их уже
+    нет — молчим, перерисовывать нечего, а сообщение остаётся как было."""
+    if not message_id or where == "here":
+        return
+    try:
+        index = int(where)
+    except ValueError:
+        return
+
+    pages = store.load_digest(chat_id)
+    if not pages or not 0 <= index < len(pages):
+        return
+    tg.edit(chat_id, message_id, pages[index],
+            core.digest_keyboard(index, len(pages)))
+
+
 def handle_callback(callback: dict) -> None:
     data = callback.get("data") or ""
     message = callback.get("message") or {}
     chat = message.get("chat") or {}
     if not chat.get("id"):
+        tg.answer_callback(callback["id"])
+        return
+
+    # Листание дайджеста идёт в обход мастера: ни профиль, ни карточка
+    # настроек тут ни при чём, правится только само сообщение с подборкой.
+    if data.startswith("dg:"):
+        _turn_page(chat["id"], message.get("message_id"), data[3:])
         tg.answer_callback(callback["id"])
         return
 

@@ -159,6 +159,29 @@ def load_pool() -> tuple[list[dict], str | None]:
     return data.get("rows") or [], data.get("collected_at")
 
 
+def save_digest(chat_id: int | str, pages: list[str]) -> None:
+    """Страницы последнего дайджеста: по ним кнопки «Далее» и «Назад»
+    перерисовывают сообщение. Живут неделю — к следующему дайджесту старые
+    страницы не нужны, а место в хранилище бесплатным не бывает."""
+    if len(pages) <= 1:
+        return
+    _command(
+        "SET", f"finderjob:digest:{chat_id}",
+        json.dumps(pages, ensure_ascii=False), "EX", 7 * 24 * 3600,
+    )
+
+
+def load_digest(chat_id: int | str) -> list[str]:
+    raw = _command("GET", f"finderjob:digest:{chat_id}")
+    if not raw:
+        return []
+    try:
+        pages = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    return pages if isinstance(pages, list) else []
+
+
 def mark_sent(day: str) -> None:
     """Отметка «за этот день рассылка состоялась». По ней догоняющие запуски
     понимают, что делать нечего, и выходят молча."""

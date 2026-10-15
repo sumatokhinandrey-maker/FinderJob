@@ -435,8 +435,51 @@ def _grouped(vacancies: list[Vacancy], roles: list[str]) -> str:
     return "\n\n".join(blocks)
 
 
+PER_PAGE = 10
+
+
+def build_pages(vacancies: list[Vacancy], held_back: int = 0,
+                roles: list[str] | None = None,
+                per_page: int = PER_PAGE) -> list[str]:
+    """Дайджест страницами по per_page вакансий.
+
+    Длинная подборка раньше уходила простынёй на несколько сообщений подряд:
+    Telegram режет всё, что длиннее 4096 символов, и листать это невозможно.
+    Теперь страницы переключаются кнопками, а текст правится на месте.
+
+    Число в заголовке — общее по подборке, а не по странице: иначе человек
+    на второй странице думает, что вакансий всего десять.
+    """
+    if not vacancies:
+        return [build_digest(vacancies, held_back, roles)]
+
+    chunks = [
+        vacancies[start:start + per_page]
+        for start in range(0, len(vacancies), per_page)
+    ]
+    total = len(vacancies)
+    # Приписку про скрытые показываем один раз, на первой странице.
+    return [
+        build_digest(chunk, held_back if index == 0 else 0, roles, total=total)
+        for index, chunk in enumerate(chunks)
+    ]
+
+
+def digest_keyboard(index: int, pages: int) -> list[list[dict]] | None:
+    """Кнопки листания. Средняя — счётчик страниц, она ничего не делает."""
+    if pages <= 1:
+        return None
+    row = []
+    if index > 0:
+        row.append({"text": "← Назад", "callback_data": f"dg:{index - 1}"})
+    row.append({"text": f"{index + 1} из {pages}", "callback_data": "dg:here"})
+    if index < pages - 1:
+        row.append({"text": "Далее →", "callback_data": f"dg:{index + 1}"})
+    return [row]
+
+
 def build_digest(vacancies: list[Vacancy], held_back: int = 0,
-                 roles: list[str] | None = None) -> str:
+                 roles: list[str] | None = None, total: int | None = None) -> str:
     """held_back — сколько вакансий скрыто из-за неназванного грейда.
     Молчать об этом нельзя: у тех, кто ищет стажировку, подборка выходит
     короткой, и без объяснения это неотличимо от поломки бота.
@@ -458,7 +501,8 @@ def build_digest(vacancies: list[Vacancy], held_back: int = 0,
     if not vacancies:
         return header + "\nСегодня ничего нового по твоим фильтрам." + note
 
-    header += f" · {len(vacancies)} " + _plural(len(vacancies))
+    counted = total if total is not None else len(vacancies)
+    header += f" · {counted} " + _plural(counted)
     # Заголовки групп нужны, только когда групп правда несколько: над
     # единственной пачкой заголовок — лишний шум.
     body = ""
