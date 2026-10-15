@@ -28,8 +28,8 @@ sys.path.insert(0, str(ROOT))
 import core  # noqa: E402
 from finderjob import profile as prof  # noqa: E402
 from finderjob import stats, store, taxonomy, tg  # noqa: E402
-from sources import (careerspace, companies, designer, getmatch,  # noqa: E402
-                     habr, hh, hirehi, telegram)
+from sources import (careerspace, companies, designer, friendwork,  # noqa: E402
+                     getmatch, habr, hh, hirehi, telegram)
 
 
 def load_env() -> None:
@@ -155,6 +155,7 @@ def main() -> int:
                               ("hh", "hh", hh), ("getmatch", "getmatch", getmatch),
                               ("designer.ru", "designer", designer),
                               ("карьерные сайты", "companies", companies),
+                              ("friend.work", "friendwork", friendwork),
                               ("telegram", "telegram", telegram)):
         own = windows.get(key)
         start = (date.today() - timedelta(days=own)).isoformat() if own else since

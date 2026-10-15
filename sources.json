@@ -223,6 +223,18 @@
         ]
       }
     },
+    "friendwork": {
+      "label": "friend.work",
+      "status": "connected",
+      "route_kind": "portal",
+      "_note": "Маршрут — token карьерного портала на платформе FriendWork: один запрос к api.friend.work отдаёт портал целиком, по всем профессиям сразу. Поэтому у всех направлений маршрут один и тот же, а повторы схлопывает сам источник. Портал Skillbox ценен стажировками и практиками, которых в других источниках почти нет.",
+      "routes": {
+        "design": ["skillbox"],
+        "dev": ["skillbox"],
+        "content": ["skillbox"],
+        "product": ["skillbox"]
+      }
+    },
     "telegram": {
       "label": "Telegram",
       "status": "connected",

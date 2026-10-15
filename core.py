@@ -114,6 +114,12 @@ ENTRY_GRADES = {"intern", "junior"}
 # и регистраций, поэтому при склейке дублей они выигрывают у всех.
 COMPANY_SITES = {"yandex", "magnit", "mts", "tbank", "rwb", "vk", "sberdevices"}
 
+# Площадки, которые приходят только тем, кто выбрал их сам. Обычная площадка
+# при пустом списке источников считается подходящей, но портал Skillbox
+# рассматривает отклик лишь с резюме по их шаблону: человеку со стороны такая
+# вакансия — обещание, которое бот выполнить не может.
+OPT_IN_SOURCES = {"friendwork"}
+
 
 def _place_allowed(vacancy: Vacancy, rules: dict) -> bool:
     """Регион подходит? Касается только гибрида и офиса — на удалёнку не влияет.
@@ -163,6 +169,8 @@ def check(vacancy: Vacancy, profile: dict) -> str | None:
     # общим: вакансии собираются один раз на всех подписчиков, а выбор
     # источника — это то, что человек готов видеть у себя в подборке.
     sources = profile.get("sources") or []
+    if vacancy.source in OPT_IN_SOURCES and vacancy.source not in sources:
+        return "source"
     if sources:
         # Карьерные сайты выбираются одной кнопкой «Сайты компаний»,
         # а в вакансии стоит конкретная площадка: yandex, vk, mts.
@@ -270,6 +278,7 @@ OPENNESS = {
     "careerspace": 1,
     "getmatch": 1,
     "designer": 1,
+    "friendwork": 1,
     "hirehi": 2,
     "telegram": 1,
 }
@@ -342,6 +351,7 @@ SOURCE_LABEL = {
     "hh": "hh.ru",
     "getmatch": "getmatch",
     "designer": "designer.ru",
+    "friendwork": "Skillbox",
     "yandex": "Yandex",
     "vk": "VK",
     "tbank": "Т-Банк",
