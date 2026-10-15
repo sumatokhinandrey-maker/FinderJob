@@ -459,20 +459,27 @@ def build_pages(vacancies: list[Vacancy], held_back: int = 0,
     ]
     total = len(vacancies)
     # Приписку про скрытые показываем один раз, на первой странице.
-    return [
+    pages = [
         build_digest(chunk, held_back if index == 0 else 0, roles, total=total)
         for index, chunk in enumerate(chunks)
     ]
+    if len(pages) > 1:
+        # Счётчик — строкой под списком, а не кнопкой: кнопка, которая
+        # ничего не делает, только сбивает с толку.
+        pages = [
+            f"{text}\n\nСтр. {index + 1}/{len(pages)}"
+            for index, text in enumerate(pages)
+        ]
+    return pages
 
 
 def digest_keyboard(index: int, pages: int) -> list[list[dict]] | None:
-    """Кнопки листания. Средняя — счётчик страниц, она ничего не делает."""
+    """Только навигация: на первой странице одна кнопка, дальше две."""
     if pages <= 1:
         return None
     row = []
     if index > 0:
         row.append({"text": "← Назад", "callback_data": f"dg:{index - 1}"})
-    row.append({"text": f"{index + 1} из {pages}", "callback_data": "dg:here"})
     if index < pages - 1:
         row.append({"text": "Далее →", "callback_data": f"dg:{index + 1}"})
     return [row]
