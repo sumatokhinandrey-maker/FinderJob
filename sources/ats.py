@@ -197,7 +197,7 @@ def collect(since: str, limit: int | None = None,
             continue
         try:
             jobs = adapter(company["slug"], directions)
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, ValueError) as exc:
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
             print(f"  ! доска {company['name']} ({company['platform']}) не ответила: {exc}")
             continue
 

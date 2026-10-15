@@ -37,6 +37,12 @@ from sources.ats import REGISTRY, USER_AGENT  # noqa: E402
 
 PAUSE_SEC = 0.25
 MIN_MENTIONS = 3
+# Имя организации пишет сам владелец аккаунта, поэтому оно подделывается:
+# 15.10.2026 «google» и «accenture» на Recruitee оказались пробными
+# аккаунтами с шаблонной вакансией «Senior Marketer (Sample)». Такие доски
+# маленькие и полны образцов — их на ручную проверку или сразу мимо.
+MIN_JOBS = 3
+_SAMPLE = re.compile(r"\b(sample|demo|test|example|template)\b|\(sample\)", re.I)
 
 BOARDS = {
     "greenhouse": "https://boards-api.greenhouse.io/v1/boards/{s}",
@@ -54,7 +60,9 @@ def _get(url: str):
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             return json.loads(resp.read())
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, ValueError):
+    # OSError, а не TimeoutError: на Python 3.9 таймаут сокета ещё не входит
+    # в TimeoutError, и поиск падал на первом же подвисшем ответе.
+    except (OSError, json.JSONDecodeError, ValueError):
         return None
 
 
@@ -72,32 +80,41 @@ def slugs(name: str) -> list[str]:
     return [s for s in dict.fromkeys(found) if len(s) >= 3]
 
 
-def inspect(platform: str, data) -> tuple[int, str | None, str]:
-    """(сколько вакансий, имя организации, тексты для сверки)"""
+def inspect(platform: str, data) -> tuple[int, str | None, str, list[str]]:
+    """(сколько вакансий, имя организации, тексты для сверки, заголовки)"""
     if platform == "greenhouse":
         jobs = (_get(BOARDS["greenhouse"].format(s=data["_slug"]) + "/jobs") or {}).get("jobs") or []
-        return len(jobs), data.get("name"), ""
+        return len(jobs), data.get("name"), "", [j.get("title") or "" for j in jobs]
     if platform == "workable":
-        return len(data.get("jobs") or []), data.get("name"), ""
+        jobs = data.get("jobs") or []
+        return len(jobs), data.get("name"), "", [j.get("title") or "" for j in jobs]
     if platform == "smartrecruiters":
         items = data.get("content") or []
         org = (items[0].get("company") or {}).get("name") if items else None
-        return int(data.get("totalFound") or 0), org, ""
+        return int(data.get("totalFound") or 0), org, "", [j.get("name") or "" for j in items]
     if platform == "recruitee":
         offers = data.get("offers") or []
-        return len(offers), (offers[0].get("company_name") if offers else None), ""
+        return (len(offers), (offers[0].get("company_name") if offers else None), "",
+                [o.get("title") or "" for o in offers])
     if platform == "lever":
         posts = data if isinstance(data, list) else []
         text = " ".join(f"{p.get('descriptionPlain') or ''} {p.get('additionalPlain') or ''}"
                         for p in posts[:10])
-        return len(posts), None, text
+        return len(posts), None, text, [p.get("text") or "" for p in posts]
     if platform == "ashby":
         jobs = data.get("jobs") or []
-        return len(jobs), None, " ".join(j.get("descriptionPlain") or "" for j in jobs[:10])
-    return 0, None, ""
+        return (len(jobs), None, " ".join(j.get("descriptionPlain") or "" for j in jobs[:10]),
+                [j.get("title") or "" for j in jobs])
+    return 0, None, "", []
 
 
-def verdict(name: str, org: str | None, text: str) -> tuple[str, str]:
+def verdict(name: str, org: str | None, text: str, total: int = MIN_JOBS,
+            titles: list[str] | None = None) -> tuple[str, str]:
+    samples = [t for t in titles or [] if _SAMPLE.search(t)]
+    if samples:
+        return "rejected", f"шаблонная доска: «{samples[0][:40]}»"
+    if total < MIN_JOBS:
+        return "review", f"всего {total} вакансий — похоже на пробный аккаунт, проверить руками"
     full = " ".join(_words(name))
     if org:
         same = " ".join(_words(org))
@@ -146,24 +163,26 @@ def main() -> int:
                     continue
                 if isinstance(data, dict):
                     data["_slug"] = slug
-                total, org, text = inspect(platform, data)
+                total, org, text, titles = inspect(platform, data)
                 if total <= 0:
                     continue
-                status, why = verdict(name, org, text)
+                status, why = verdict(name, org, text, total, titles)
                 entry = {"name": name, "platform": platform, "slug": slug,
                          "status": status, "confirmed_by": why}
                 added.append(entry)
                 known.add((platform, slug))
-                print(f"  {status:8} {name[:28]:28} → {platform}:{slug} — {total} | {why}")
+                print(f"  {status:8} {name[:28]:28} → {platform}:{slug} — {total} | {why}",
+                      flush=True)
+                if not args.dry_run:
+                    # Пишем сразу: прогон долгий, и сбой на середине не должен
+                    # стирать уже найденное.
+                    registry["companies"].append(entry)
+                    registry["checked"] = date.today().isoformat()
+                    REGISTRY.write_text(
+                        json.dumps(registry, ensure_ascii=False, indent=2) + "\n", "utf-8")
 
     print(f"\nНовых записей: {len(added)}, из них подтверждено: "
           f"{sum(1 for e in added if e['status'] == 'verified')}")
-    if args.dry_run or not added:
-        return 0
-    registry["companies"].extend(added)
-    registry["checked"] = date.today().isoformat()
-    REGISTRY.write_text(json.dumps(registry, ensure_ascii=False, indent=2) + "\n", "utf-8")
-    print(f"Реестр обновлён: {REGISTRY.name}")
     return 0
 
 
