@@ -118,7 +118,7 @@ ENTRY_GRADES = {"intern", "junior"}
 # Карьерные сайты компаний: отклик идёт напрямую работодателю, без посредников
 # и регистраций, поэтому при склейке дублей они выигрывают у всех.
 COMPANY_SITES = {"yandex", "magnit", "mts", "tbank", "rwb", "vk", "sberdevices",
-                 "x5", "tochka", "alfa"}
+                 "x5", "tochka", "alfa", "ats"}
 
 # Кириллица в заголовке — простой и честный признак русскоязычной вакансии.
 # Угадывать язык по описанию не беремся: у половины вакансий описание
@@ -284,7 +284,7 @@ def _fingerprint(vacancy: Vacancy) -> tuple:
 OPENNESS = {
     # Сайт самой компании — лучшее, куда можно привести: отклик напрямую.
     **{key: 0 for key in ("yandex", "magnit", "mts", "tbank", "rwb", "vk",
-                          "sberdevices", "x5", "tochka", "alfa")},
+                          "sberdevices", "x5", "tochka", "alfa", "ats")},
     "hh": 1,
     "habr": 1,
     "careerspace": 1,
@@ -376,6 +376,7 @@ SOURCE_LABEL = {
     "x5": "X5 Tech",
     "tochka": "Точка",
     "alfa": "Альфа-Банк",
+    "ats": "сайт компании",
     "rwb": "RWB",
     "sberdevices": "SberDevices",
     "telegram": "Telegram",

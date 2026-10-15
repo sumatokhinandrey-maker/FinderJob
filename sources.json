@@ -290,6 +290,26 @@
         ]
       }
     },
+    "ats": {
+      "label": "сайты компаний",
+      "status": "connected",
+      "route_kind": "direction",
+      "_note": "Собственные доски компаний на публичных ATS (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Recruitee) — их официальные API для встраивания вакансий. Список компаний — ats_registry.json, пополняет discover_ats.py, в обход идут только подтверждённые работодатели. Маршрут — направление: источник сам отбирает вакансии ролей этого направления.",
+      "routes": {
+        "design": [
+          "design"
+        ],
+        "dev": [
+          "dev"
+        ],
+        "product": [
+          "product"
+        ],
+        "content": [
+          "content"
+        ]
+      }
+    },
     "linkedin": {
       "label": "LinkedIn",
       "status": "connected",

@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT))
 import core  # noqa: E402
 from finderjob import profile as prof  # noqa: E402
 from finderjob import stats, store, taxonomy, tg  # noqa: E402
-from sources import (careerspace, companies, designer, finder,  # noqa: E402
+from sources import (ats, careerspace, companies, designer, finder,  # noqa: E402
                      friendwork, getmatch, habr, hh, hirehi, linkedin,
                      telegram)
 
@@ -174,6 +174,7 @@ def main() -> int:
                               ("hh", "hh", hh), ("getmatch", "getmatch", getmatch),
                               ("designer.ru", "designer", designer),
                               ("карьерные сайты", "companies", companies),
+                              ("доски компаний", "ats", ats),
                               ("linkedin", "linkedin", linkedin),
                               ("friend.work", "friendwork", friendwork),
                               ("telegram", "telegram", telegram)):
