@@ -11,7 +11,8 @@
         ],
         "dev": [
           "sitemap-vacancies-development.xml",
-          "sitemap-vacancies-qa.xml"
+          "sitemap-vacancies-qa.xml",
+          "sitemap-vacancies-devops.xml"
         ],
         "content": [
           "sitemap-vacancies-marketing.xml"
@@ -85,6 +86,59 @@
         ],
         "product.project": [
           "проджект-менеджер"
+        ],
+        "design.illustration": [
+          "иллюстратор",
+          "concept artist"
+        ],
+        "content.seo": [
+          "seo-специалист"
+        ],
+        "content.paid": [
+          "таргетолог",
+          "специалист по контекстной рекламе"
+        ],
+        "content.crm": [
+          "crm-маркетолог",
+          "email-маркетолог"
+        ],
+        "content.growth": [
+          "growth manager",
+          "affiliate manager"
+        ],
+        "content.aso": [
+          "aso-специалист"
+        ],
+        "dev.ml": [
+          "ml-инженер",
+          "data scientist"
+        ],
+        "dev.data": [
+          "data engineer",
+          "дата-инженер"
+        ],
+        "dev.devops": [
+          "devops-инженер",
+          "sre"
+        ],
+        "dev.security": [
+          "специалист по информационной безопасности"
+        ],
+        "dev.qa_auto": [
+          "автоматизатор тестирования",
+          "qa automation"
+        ],
+        "product.ba": [
+          "бизнес-аналитик"
+        ],
+        "product.sa": [
+          "системный аналитик"
+        ],
+        "product.data_analyst": [
+          "аналитик данных"
+        ],
+        "product.commercial": [
+          "коммерческий директор"
         ]
       }
     },
@@ -152,6 +206,59 @@
         ],
         "product.project": [
           "проджект-менеджер"
+        ],
+        "design.illustration": [
+          "иллюстратор",
+          "concept artist"
+        ],
+        "content.seo": [
+          "seo-специалист"
+        ],
+        "content.paid": [
+          "таргетолог",
+          "специалист по контекстной рекламе"
+        ],
+        "content.crm": [
+          "crm-маркетолог",
+          "email-маркетолог"
+        ],
+        "content.growth": [
+          "growth manager",
+          "affiliate manager"
+        ],
+        "content.aso": [
+          "aso-специалист"
+        ],
+        "dev.ml": [
+          "ml-инженер",
+          "data scientist"
+        ],
+        "dev.data": [
+          "data engineer",
+          "дата-инженер"
+        ],
+        "dev.devops": [
+          "devops-инженер",
+          "sre"
+        ],
+        "dev.security": [
+          "специалист по информационной безопасности"
+        ],
+        "dev.qa_auto": [
+          "автоматизатор тестирования",
+          "qa automation"
+        ],
+        "product.ba": [
+          "бизнес-аналитик"
+        ],
+        "product.sa": [
+          "системный аналитик"
+        ],
+        "product.data_analyst": [
+          "аналитик данных"
+        ],
+        "product.commercial": [
+          "коммерческий директор"
         ]
       }
     },
@@ -339,6 +446,30 @@
         ],
         "product.manager": [
           "product manager"
+        ],
+        "dev.ml": [
+          "machine learning engineer"
+        ],
+        "dev.data": [
+          "data engineer"
+        ],
+        "dev.devops": [
+          "devops engineer"
+        ],
+        "dev.security": [
+          "security engineer"
+        ],
+        "product.ba": [
+          "business analyst"
+        ],
+        "product.data_analyst": [
+          "data analyst"
+        ],
+        "content.seo": [
+          "seo specialist"
+        ],
+        "content.growth": [
+          "growth manager"
         ]
       }
     },
