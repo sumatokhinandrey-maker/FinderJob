@@ -11,7 +11,8 @@
         ],
         "dev": [
           "sitemap-vacancies-development.xml",
-          "sitemap-vacancies-qa.xml"
+          "sitemap-vacancies-qa.xml",
+          "sitemap-vacancies-devops.xml"
         ],
         "content": [
           "sitemap-vacancies-marketing.xml"
@@ -85,6 +86,179 @@
         ],
         "product.project": [
           "проджект-менеджер"
+        ],
+        "design.illustration": [
+          "иллюстратор",
+          "concept artist"
+        ],
+        "content.seo": [
+          "seo-специалист"
+        ],
+        "content.paid": [
+          "таргетолог",
+          "специалист по контекстной рекламе"
+        ],
+        "content.crm": [
+          "crm-маркетолог",
+          "email-маркетолог"
+        ],
+        "content.growth": [
+          "growth manager",
+          "affiliate manager"
+        ],
+        "content.aso": [
+          "aso-специалист"
+        ],
+        "dev.ml": [
+          "ml-инженер",
+          "data scientist"
+        ],
+        "dev.data": [
+          "data engineer",
+          "дата-инженер"
+        ],
+        "dev.devops": [
+          "devops-инженер",
+          "sre"
+        ],
+        "dev.security": [
+          "специалист по информационной безопасности"
+        ],
+        "dev.qa_auto": [
+          "автоматизатор тестирования",
+          "qa automation"
+        ],
+        "product.ba": [
+          "бизнес-аналитик"
+        ],
+        "product.sa": [
+          "системный аналитик"
+        ],
+        "product.data_analyst": [
+          "аналитик данных"
+        ],
+        "product.commercial": [
+          "коммерческий директор"
+        ]
+      }
+    },
+    "finder": {
+      "label": "finder",
+      "status": "connected",
+      "route_kind": "query",
+      "_note": "Маршрут — полнотекстовый запрос к api.finder.work. Запросы те же, что у hh, и не случайно: у всех проверенных записей external_url ведёт на hh.ru, то есть это тот же рынок, но без потолка в 20 свежих на запрос. robots их API запрещает всё, Андрей предупреждён 15.10.2026.",
+      "routes": {
+        "design.product": [
+          "продуктовый дизайнер",
+          "ux/ui дизайнер",
+          "дизайнер интерфейсов",
+          "product designer",
+          "ui дизайнер"
+        ],
+        "design.web": [
+          "веб-дизайнер"
+        ],
+        "design.graphic": [
+          "графический дизайнер"
+        ],
+        "design.motion": [
+          "моушн дизайнер"
+        ],
+        "content.copywriter": [
+          "копирайтер"
+        ],
+        "content.editor": [
+          "редактор"
+        ],
+        "content.smm": [
+          "smm-специалист",
+          "smm-менеджер"
+        ],
+        "content.maker": [
+          "контент-менеджер",
+          "контент-мейкер"
+        ],
+        "dev.frontend": [
+          "frontend разработчик",
+          "react разработчик"
+        ],
+        "dev.backend": [
+          "backend разработчик",
+          "python разработчик"
+        ],
+        "dev.mobile": [
+          "ios разработчик",
+          "android разработчик"
+        ],
+        "dev.fullstack": [
+          "fullstack разработчик"
+        ],
+        "dev.qa": [
+          "qa инженер",
+          "тестировщик"
+        ],
+        "product.manager": [
+          "продакт-менеджер"
+        ],
+        "product.analyst": [
+          "продуктовый аналитик",
+          "аналитик данных"
+        ],
+        "product.project": [
+          "проджект-менеджер"
+        ],
+        "design.illustration": [
+          "иллюстратор",
+          "concept artist"
+        ],
+        "content.seo": [
+          "seo-специалист"
+        ],
+        "content.paid": [
+          "таргетолог",
+          "специалист по контекстной рекламе"
+        ],
+        "content.crm": [
+          "crm-маркетолог",
+          "email-маркетолог"
+        ],
+        "content.growth": [
+          "growth manager",
+          "affiliate manager"
+        ],
+        "content.aso": [
+          "aso-специалист"
+        ],
+        "dev.ml": [
+          "ml-инженер",
+          "data scientist"
+        ],
+        "dev.data": [
+          "data engineer",
+          "дата-инженер"
+        ],
+        "dev.devops": [
+          "devops-инженер",
+          "sre"
+        ],
+        "dev.security": [
+          "специалист по информационной безопасности"
+        ],
+        "dev.qa_auto": [
+          "автоматизатор тестирования",
+          "qa automation"
+        ],
+        "product.ba": [
+          "бизнес-аналитик"
+        ],
+        "product.sa": [
+          "системный аналитик"
+        ],
+        "product.data_analyst": [
+          "аналитик данных"
+        ],
+        "product.commercial": [
+          "коммерческий директор"
         ]
       }
     },
@@ -223,15 +397,99 @@
         ]
       }
     },
+    "ats": {
+      "label": "сайты компаний",
+      "status": "connected",
+      "route_kind": "direction",
+      "_note": "Собственные доски компаний на публичных ATS (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Recruitee) — их официальные API для встраивания вакансий. Список компаний — ats_registry.json, пополняет discover_ats.py, в обход идут только подтверждённые работодатели. Маршрут — направление: источник сам отбирает вакансии ролей этого направления.",
+      "routes": {
+        "design": [
+          "design"
+        ],
+        "dev": [
+          "dev"
+        ],
+        "product": [
+          "product"
+        ],
+        "content": [
+          "content"
+        ]
+      }
+    },
+    "linkedin": {
+      "label": "LinkedIn",
+      "status": "connected",
+      "route_kind": "query",
+      "_note": "Маршрут — АНГЛИЙСКИЙ поисковый запрос: по России индекс пуст (location=Russia отдаёт ноль), кириллица не индексируется. Место всегда Worldwide, то есть это местный найм за рубежом, где нужно разрешение на работу — поэтому источник в core.OPT_IN_SOURCES и приходит только тому, кто выбрал его сам. Их соглашение сбор скриптами запрещает; с раннера GitHub Actions может не работать, LinkedIn режет адреса дата-центров.",
+      "routes": {
+        "design.product": [
+          "product designer"
+        ],
+        "design.web": [
+          "web designer"
+        ],
+        "design.graphic": [
+          "graphic designer"
+        ],
+        "design.motion": [
+          "motion designer"
+        ],
+        "dev.frontend": [
+          "frontend developer"
+        ],
+        "dev.backend": [
+          "backend developer"
+        ],
+        "product.analyst": [
+          "product analyst"
+        ],
+        "product.manager": [
+          "product manager"
+        ],
+        "dev.ml": [
+          "machine learning engineer"
+        ],
+        "dev.data": [
+          "data engineer"
+        ],
+        "dev.devops": [
+          "devops engineer"
+        ],
+        "dev.security": [
+          "security engineer"
+        ],
+        "product.ba": [
+          "business analyst"
+        ],
+        "product.data_analyst": [
+          "data analyst"
+        ],
+        "content.seo": [
+          "seo specialist"
+        ],
+        "content.growth": [
+          "growth manager"
+        ]
+      }
+    },
+    "friendwork": {
+      "label": "friend.work",
+      "status": "backlog",
+      "route_kind": "portal",
+      "_note": "Отложено 15.10.2026, решение не принято. Маршрут — token карьерного портала на платформе FriendWork: один запрос к api.friend.work отдаёт портал целиком, по всем профессиям сразу, повторы схлопывает сам источник. Портал Skillbox ценен стажировками и практиками, которых в других источниках почти нет, но отклик там рассматривают только с резюме по шаблону Skillbox. Пустые маршруты значат, что обход туда не ходит вовсе; чтобы вернуть, достаточно вписать \"skillbox\" нужным направлениям.",
+      "routes": {}
+    },
     "telegram": {
       "label": "Telegram",
       "status": "connected",
       "route_kind": "channel",
-      "_note": "Читаются через веб-ленту t.me/s/, без аккаунта и ключей. Каналы с выключенным предпросмотром (например @hr_breakfast_emergency) так не читаются — там ноль постов, нужен авторизованный клиент.",
+      "_note": "Читаются через веб-ленту t.me/s/, без аккаунта и ключей. Каналы с выключенным предпросмотром (например @hr_breakfast_emergency) так не читаются — там ноль постов, нужен авторизованный клиент. Проверка 15.10.2026: из восьми кандидатов (mydesignjob, uxui_jobs, vacancy_design, jobs_for_designer и др.) публичный предпросмотр открыт только у workindesign — остальные без авторизации не читаются вовсе.",
       "routes": {
         "design": [
           "designoffers",
-          "designhunters"
+          "designhunters",
+          "workindesign"
         ]
       }
     }

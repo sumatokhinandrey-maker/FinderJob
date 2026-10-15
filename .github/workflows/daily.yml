@@ -18,10 +18,19 @@ on:
         description: "Разослать, даже если сегодняшний дайджест уже ушёл"
         type: boolean
         default: false
+      probe:
+        description: "Только проверить источники с раннера и выйти"
+        type: boolean
+        default: false
 
 jobs:
   digest:
     runs-on: ubuntu-latest
+    # Без потолка GitHub даёт джобу шесть часов: 15.10.2026 обход hirehi
+    # разбух и запуск висел больше двух часов, а догоняющие тем временем
+    # начинали такой же обход заново. Лучше упасть красным через час
+    # и дать догоняющему чистую попытку.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -29,7 +38,15 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Адрес раннера виден источнику, а не нам: с домашней машины LinkedIn
+      # отвечает, а дата-центры он режет. Пока это не проверено отсюда,
+      # обсуждать настройки частоты не о чем.
+      - name: Проверить источники с раннера
+        if: inputs.probe
+        run: python3 -u probe_sources.py
+
       - name: Собрать и разослать дайджест
+        if: ${{ !inputs.probe }}
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
@@ -42,4 +59,7 @@ jobs:
           # то есть оба его запуска — утренний и полуденный — слали бы
           # дайджест, и человек получал бы его дважды.
           ONCE: ${{ inputs.force && '' || '--once-a-day' }}
-        run: python3 main.py $ONCE
+        # -u обязателен: иначе stdout уходит в pipe блоками и у зависшего
+        # запуска лог пуст — 15.10.2026 так и вышло, по логам нельзя было
+        # понять, на каком источнике он встал.
+        run: python3 -u main.py $ONCE

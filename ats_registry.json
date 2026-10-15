@@ -1,0 +1,244 @@
+{
+  "_comment": "Компании с собственной доской вакансий на публичной ATS-платформе. В обход идут только записи со status=verified. Подтверждение — имя организации, которое отдаёт сама платформа (Greenhouse, Workable, SmartRecruiters), либо полное название компании, многократно встречающееся в текстах её вакансий (Lever и Ashby имени не отдают). Совпадение адреса доски с названием подтверждением НЕ считается. Пополняет discover_ats.py; записи review ждут ручной проверки.",
+  "checked": "2026-10-16",
+  "companies": [
+    {
+      "name": "Air Apps",
+      "platform": "ashby",
+      "slug": "airapps",
+      "status": "verified",
+      "confirmed_by": "полное название в 98 местах из 10 описаний"
+    },
+    {
+      "name": "EverAI",
+      "platform": "ashby",
+      "slug": "everai",
+      "status": "verified",
+      "confirmed_by": "полное название в 33 местах из 10 описаний"
+    },
+    {
+      "name": "Xsolla",
+      "platform": "lever",
+      "slug": "xsolla",
+      "status": "verified",
+      "confirmed_by": "полное название в 81 месте из 10 описаний"
+    },
+    {
+      "name": "Tripledot Studios",
+      "platform": "greenhouse",
+      "slug": "tripledotstudios",
+      "status": "verified",
+      "confirmed_by": "имя организации на платформе: Tripledot Studios"
+    },
+    {
+      "name": "Gigs",
+      "platform": "greenhouse",
+      "slug": "gigs",
+      "status": "verified",
+      "confirmed_by": "имя организации на платформе: Gigs"
+    },
+    {
+      "name": "Treatwell",
+      "platform": "workable",
+      "slug": "treatwell",
+      "status": "verified",
+      "confirmed_by": "имя организации на платформе: Treatwell"
+    },
+    {
+      "name": "1000heads",
+      "platform": "workable",
+      "slug": "1000heads",
+      "status": "verified",
+      "confirmed_by": "имя организации на платформе: 1000heads"
+    },
+    {
+      "name": "Accor",
+      "platform": "smartrecruiters",
+      "slug": "accorhotel",
+      "status": "verified",
+      "confirmed_by": "имя организации на платформе: AccorHotel"
+    },
+    {
+      "name": "Gigs",
+      "platform": "ashby",
+      "slug": "gigs",
+      "status": "review",
+      "confirmed_by": "вторая доска той же компании? Подтверждена Greenhouse-доска; эту не берём, чтобы не задвоить"
+    },
+    {
+      "name": "Revel Robotics",
+      "platform": "ashby",
+      "slug": "revelrobotics",
+      "status": "review",
+      "confirmed_by": "НЕ подтверждено: полное название ни разу не встречается в описаниях"
+    },
+    {
+      "name": "Top Selection",
+      "platform": "smartrecruiters",
+      "slug": "topselection",
+      "status": "review",
+      "confirmed_by": "НЕ подтверждено: платформа не отдала ни имени, ни вакансий по запросу"
+    },
+    {
+      "name": "Accenture",
+      "platform": "recruitee",
+      "slug": "accenture",
+      "status": "rejected",
+      "confirmed_by": "шаблонная доска: «Senior Marketer (Sample)»"
+    },
+    {
+      "name": "AccorCorpo",
+      "platform": "smartrecruiters",
+      "slug": "accorcorpo",
+      "status": "verified",
+      "confirmed_by": "имя организации на платформе: AccorCorpo"
+    },
+    {
+      "name": "AppNation",
+      "platform": "lever",
+      "slug": "appnation",
+      "status": "verified",
+      "confirmed_by": "полное название в описаниях: 21 раз"
+    },
+    {
+      "name": "Armada",
+      "platform": "greenhouse",
+      "slug": "armada",
+      "status": "verified",
+      "confirmed_by": "имя организации на платформе: Armada"
+    },
+    {
+      "name": "Betsson Group",
+      "platform": "greenhouse",
+      "slug": "betsson",
+      "status": "verified",
+      "confirmed_by": "имя организации на платформе: Betsson Group"
+    },
+    {
+      "name": "Bybit",
+      "platform": "greenhouse",
+      "slug": "bybit",
+      "status": "verified",
+      "confirmed_by": "имя организации на платформе: Bybit"
+    },
+    {
+      "name": "ClickHouse",
+      "platform": "ashby",
+      "slug": "clickhouse",
+      "status": "verified",
+      "confirmed_by": "полное название в описаниях: 152 раз"
+    },
+    {
+      "name": "CoMind",
+      "platform": "ashby",
+      "slug": "comind",
+      "status": "verified",
+      "confirmed_by": "полное название в описаниях: 43 раз"
+    },
+    {
+      "name": "CuspAI",
+      "platform": "ashby",
+      "slug": "cuspai",
+      "status": "verified",
+      "confirmed_by": "полное название в описаниях: 61 раз"
+    },
+    {
+      "name": "Darkroom",
+      "platform": "ashby",
+      "slug": "darkroom",
+      "status": "verified",
+      "confirmed_by": "полное название в описаниях: 110 раз"
+    },
+    {
+      "name": "DataChef",
+      "platform": "smartrecruiters",
+      "slug": "datachef",
+      "status": "review",
+      "confirmed_by": "всего 1 вакансий — похоже на пробный аккаунт, проверить руками"
+    },
+    {
+      "name": "Diligent Corporation",
+      "platform": "greenhouse",
+      "slug": "diligentcorporation",
+      "status": "verified",
+      "confirmed_by": "имя организации на платформе: Diligent Corporation"
+    },
+    {
+      "name": "Fastmarkets",
+      "platform": "smartrecruiters",
+      "slug": "fastmarkets",
+      "status": "verified",
+      "confirmed_by": "имя организации на платформе: Fastmarkets"
+    },
+    {
+      "name": "Gismart",
+      "platform": "ashby",
+      "slug": "gismart",
+      "status": "verified",
+      "confirmed_by": "полное название в описаниях: 122 раз"
+    },
+    {
+      "name": "Google",
+      "platform": "recruitee",
+      "slug": "google",
+      "status": "rejected",
+      "confirmed_by": "шаблонная доска: «Senior Marketer (Sample)»"
+    },
+    {
+      "name": "Green Light Company",
+      "platform": "lever",
+      "slug": "greenlight",
+      "status": "review",
+      "confirmed_by": "полное название в описаниях: 0 раз"
+    },
+    {
+      "name": "HelloFresh",
+      "platform": "greenhouse",
+      "slug": "hellofresh",
+      "status": "verified",
+      "confirmed_by": "имя организации на платформе: HelloFresh"
+    },
+    {
+      "name": "Hostaway",
+      "platform": "recruitee",
+      "slug": "hostaway",
+      "status": "verified",
+      "confirmed_by": "имя организации на платформе: Hostaway"
+    },
+    {
+      "name": "METRO/MAKRO",
+      "platform": "smartrecruiters",
+      "slug": "metromakro",
+      "status": "verified",
+      "confirmed_by": "имя организации на платформе: METRO/MAKRO"
+    },
+    {
+      "name": "Nova by Korn Ferry",
+      "platform": "smartrecruiters",
+      "slug": "novabykornferry",
+      "status": "verified",
+      "confirmed_by": "имя организации на платформе: Nova by Korn Ferry"
+    },
+    {
+      "name": "OnHires",
+      "platform": "ashby",
+      "slug": "onhires",
+      "status": "review",
+      "confirmed_by": "полное название в описаниях: 0 раз"
+    },
+    {
+      "name": "Toogeza",
+      "platform": "ashby",
+      "slug": "toogeza",
+      "status": "verified",
+      "confirmed_by": "полное название в описаниях: 16 раз"
+    },
+    {
+      "name": "emagine",
+      "platform": "ashby",
+      "slug": "emagine",
+      "status": "verified",
+      "confirmed_by": "полное название в описаниях: 79 раз"
+    }
+  ]
+}

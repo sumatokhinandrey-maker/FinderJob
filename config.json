@@ -1,5 +1,6 @@
 {
-  "lookback_days": 2,
+  "lookback_days": 30,
+  "max_per_digest": 40,
   "role": {
     "include_any": [
       "ux",
@@ -37,5 +38,9 @@
     "designer": 21,
     "careerspace": 14,
     "getmatch": 14
-  }
+  },
+  "max_pages_by_source": {
+    "hirehi": 300
+  },
+  "hh_areas": [113, 40, 28, 97]
 }

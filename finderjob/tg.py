@@ -93,6 +93,16 @@ def edit(chat_id: int | str, message_id: int, text: str, keyboard: list | None) 
             raise
 
 
+def delete(chat_id: int | str, message_id: int) -> None:
+    """Убираем сообщение из чата. Удалить чужое сообщение бот вправе только
+    в личной переписке и только пока ему меньше 48 часов, а ещё человек мог
+    стереть его сам — поэтому отказ Telegram здесь не ошибка."""
+    try:
+        call("deleteMessage", chat_id=chat_id, message_id=message_id)
+    except RuntimeError:
+        pass
+
+
 def answer_callback(callback_id: str, text: str = "") -> None:
     """Гасим часики на кнопке. Без этого Telegram крутит их несколько секунд."""
     try:

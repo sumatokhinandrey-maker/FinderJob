@@ -50,7 +50,6 @@
             "упаковк",
             "коммуникац",
             "communication designer",
-            "иллюстра",
             "креативн",
             "презентац"
           ],
@@ -108,6 +107,23 @@
             "creative director"
           ],
           "exclude": []
+        },
+        "illustration": {
+          "label": "Иллюстрация",
+          "include": [
+            "иллюстра",
+            "illustrator",
+            "illustration",
+            "художник",
+            "concept artist",
+            "концепт-художник",
+            "2d artist",
+            "3d artist"
+          ],
+          "exclude": [
+            "adobe illustrator",
+            "владение illustrator"
+          ]
         }
       }
     },
@@ -168,6 +184,75 @@
             "marketing",
             "performance-",
             "трафик"
+          ],
+          "exclude": []
+        },
+        "seo": {
+          "label": "SEO",
+          "include": [
+            "seo",
+            "сео-специалист",
+            "поисковая оптимизац",
+            "search engine optimization"
+          ],
+          "exclude": []
+        },
+        "paid": {
+          "label": "Платный трафик",
+          "include": [
+            "платный трафик",
+            "performance marketing",
+            "директолог",
+            "контекстн",
+            "таргетолог",
+            "paid acquisition",
+            "paid media",
+            "ppc",
+            "media buyer",
+            "медиабайер",
+            "user acquisition"
+          ],
+          "exclude": []
+        },
+        "crm": {
+          "label": "CRM-маркетинг",
+          "include": [
+            "crm-маркетолог",
+            "crm маркетолог",
+            "crm-менеджер",
+            "crm manager",
+            "email-маркетолог",
+            "email marketing",
+            "retention manager",
+            "менеджер по удержанию",
+            "lifecycle marketing"
+          ],
+          "exclude": [
+            "crm-аналитик"
+          ]
+        },
+        "growth": {
+          "label": "Growth",
+          "include": [
+            "growth manager",
+            "growth marketing",
+            "growth lead",
+            "growth-менеджер",
+            "affiliate manager",
+            "affiliate-менеджер",
+            "партнёрский маркетинг",
+            "партнерский маркетинг"
+          ],
+          "exclude": []
+        },
+        "aso": {
+          "label": "ASO и репутация",
+          "include": [
+            "aso",
+            "app store optimization",
+            "управлению репутацией",
+            "reputation manager",
+            "serm"
           ],
           "exclude": []
         }
@@ -232,7 +317,7 @@
           "exclude": []
         },
         "qa": {
-          "label": "Тестирование",
+          "label": "Ручное тестирование",
           "include": [
             "qa",
             "тестировщик",
@@ -240,6 +325,91 @@
             "автотест",
             "automation qa",
             "тестирован"
+          ],
+          "exclude": [
+            "automation",
+            "автоматизатор",
+            "sdet",
+            "aqa"
+          ]
+        },
+        "ml": {
+          "label": "ML и AI",
+          "include": [
+            "machine learning",
+            "машинного обучения",
+            "ml-инженер",
+            "ml engineer",
+            "data scientist",
+            "дата-сайентист",
+            "deep learning",
+            "computer vision",
+            "nlp-инженер",
+            "ai engineer",
+            "ai-инженер",
+            "llm engineer"
+          ],
+          "exclude": [
+            "ml-аналитик"
+          ]
+        },
+        "data": {
+          "label": "Дата-инженер",
+          "include": [
+            "data engineer",
+            "дата-инженер",
+            "дата инженер",
+            "инженер данных",
+            "etl-разработчик",
+            "etl developer",
+            "big data",
+            "дата-платформ"
+          ],
+          "exclude": []
+        },
+        "devops": {
+          "label": "DevOps",
+          "include": [
+            "devops",
+            "sre",
+            "site reliability",
+            "platform engineer",
+            "инженер инфраструктур",
+            "infrastructure engineer",
+            "kubernetes",
+            "cloud engineer",
+            "облачн",
+            "ci/cd",
+            "системный администратор",
+            "system administrator"
+          ],
+          "exclude": []
+        },
+        "security": {
+          "label": "Безопасность",
+          "include": [
+            "информационной безопасн",
+            "security engineer",
+            "appsec",
+            "devsecoops",
+            "devsecops",
+            "пентест",
+            "penetration test",
+            "кибербезопасн",
+            "security analyst"
+          ],
+          "exclude": []
+        },
+        "qa_auto": {
+          "label": "QA Automation",
+          "include": [
+            "автоматизатор тестирования",
+            "qa automation",
+            "automation qa",
+            "sdet",
+            "автотест",
+            "инженер по автоматизации тестирования",
+            "aqa"
           ],
           "exclude": []
         }
@@ -259,8 +429,48 @@
           ],
           "exclude": []
         },
+        "project": {
+          "label": "Проджект",
+          "include": [
+            "проджект",
+            "project manager",
+            "руководитель проект",
+            "delivery manager",
+            "project"
+          ],
+          "exclude": []
+        },
+        "ba": {
+          "label": "Бизнес-аналитик",
+          "include": [
+            "бизнес-аналитик",
+            "бизнес аналитик",
+            "business analyst"
+          ],
+          "exclude": []
+        },
+        "sa": {
+          "label": "Системный аналитик",
+          "include": [
+            "системный аналитик",
+            "system analyst",
+            "systems analyst"
+          ],
+          "exclude": []
+        },
+        "data_analyst": {
+          "label": "Аналитик данных",
+          "include": [
+            "аналитик данных",
+            "data analyst",
+            "bi-аналитик",
+            "bi analyst",
+            "аналитик bi"
+          ],
+          "exclude": []
+        },
         "analyst": {
-          "label": "Аналитик",
+          "label": "Аналитик (любой)",
           "include": [
             "аналитик",
             "analyst",
@@ -270,14 +480,12 @@
           ],
           "exclude": []
         },
-        "project": {
-          "label": "Проджект",
+        "commercial": {
+          "label": "Коммерческий директор",
           "include": [
-            "проджект",
-            "project manager",
-            "руководитель проект",
-            "delivery manager",
-            "project"
+            "коммерческий директор",
+            "commercial director",
+            "директор по развитию"
           ],
           "exclude": []
         }

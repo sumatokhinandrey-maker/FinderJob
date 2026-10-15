@@ -70,12 +70,40 @@ def match(title: str, role_keys: list[str]) -> str | None:
         body = rule(key)
         if not body:
             continue
-        if not any(word in low for word in body.get("include", [])):
+        if not any(_has(word, low) for word in body.get("include", [])):
             continue
-        if any(word in low for word in body.get("exclude", [])):
+        if any(_has(word, low) for word in body.get("exclude", [])):
             continue
         return key
     return None
+
+
+# Короткое латинское слово ищем только целиком: как кусок оно сидит внутри
+# чужих слов — «ui» в acquisition, guide, build, «ux» в luxury и linux,
+# «ios» в studios, «qa» в aqua. Так рекрутёр EverAI попадал в продуктовый
+# дизайн (15.10.2026). Границей считается всё, кроме латинской буквы, поэтому
+# «ux/ui» и «ui-дизайнер» по-прежнему находятся. Длинные слова и кириллица
+# ищутся подстрокой, как раньше: «дизайн» должен ловить и «дизайнера».
+_SHORT_LATIN = re.compile(r"[a-z]{1,4}")
+
+
+def _has(word: str, low: str) -> bool:
+    if _SHORT_LATIN.fullmatch(word):
+        return re.search(rf"(?<![a-z]){re.escape(word)}(?![a-z])", low) is not None
+    return word in low
+
+
+if __name__ == "__main__":
+    keys = all_role_keys()
+    for wrong in ("Mid/Senior Talent Acquisition Specialist", "Customer Success Guide",
+                  "Build Engineer", "Quick Commerce Lead", "Luxury Retail Manager"):
+        assert match(wrong, ["design.product"]) is None, wrong
+    for right in ("UI Designer", "UX/UI дизайнер", "UI-дизайнер", "Senior UX Researcher",
+                  "Product Designer (UI/UX)", "продуктовый дизайнер"):
+        assert match(right, ["design.product"]) == "design.product", right
+    assert match("iOS Developer", keys) == "dev.mobile"
+    assert match("Game Studios Producer", ["dev.mobile"]) is None
+    print("taxonomy: проверки прошли")
 
 
 # --------------------------------------------------------------------------

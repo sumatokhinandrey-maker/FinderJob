@@ -30,6 +30,11 @@ class Vacancy:
     experience_months: int | None
     description: str
     skills: str
+    # Сайт работодателя, когда площадка его называет. У портала Skillbox
+    # отклик требует резюме по их шаблону, и сайт компании — второй путь:
+    # написать напрямую. Поле со значением по умолчанию, иначе записи,
+    # сохранённые в запас прежней версией, не прочитаются обратно.
+    company_url: str | None = None
 
     def haystack(self) -> str:
         """Всё текстовое одной строкой — по нему ищем стоп- и ключевые слова."""
@@ -112,7 +117,19 @@ ENTRY_GRADES = {"intern", "junior"}
 
 # Карьерные сайты компаний: отклик идёт напрямую работодателю, без посредников
 # и регистраций, поэтому при склейке дублей они выигрывают у всех.
-COMPANY_SITES = {"yandex", "magnit", "mts", "tbank", "rwb", "vk", "sberdevices"}
+COMPANY_SITES = {"yandex", "magnit", "mts", "tbank", "rwb", "vk", "sberdevices",
+                 "x5", "tochka", "alfa", "ats"}
+
+# Кириллица в заголовке — простой и честный признак русскоязычной вакансии.
+# Угадывать язык по описанию не беремся: у половины вакансий описание
+# английское, а заголовок русский, и наоборот.
+CYRILLIC_RE = re.compile(r"[а-яё]", re.I)
+
+# Площадки, которые приходят только тем, кто выбрал их сам. Обычная площадка
+# при пустом списке источников считается подходящей, но портал Skillbox
+# рассматривает отклик лишь с резюме по их шаблону: человеку со стороны такая
+# вакансия — обещание, которое бот выполнить не может.
+OPT_IN_SOURCES = {"friendwork", "linkedin"}
 
 
 def _place_allowed(vacancy: Vacancy, rules: dict) -> bool:
@@ -163,6 +180,8 @@ def check(vacancy: Vacancy, profile: dict) -> str | None:
     # общим: вакансии собираются один раз на всех подписчиков, а выбор
     # источника — это то, что человек готов видеть у себя в подборке.
     sources = profile.get("sources") or []
+    if vacancy.source in OPT_IN_SOURCES and vacancy.source not in sources:
+        return "source"
     if sources:
         # Карьерные сайты выбираются одной кнопкой «Сайты компаний»,
         # а в вакансии стоит конкретная площадка: yandex, vk, mts.
@@ -264,12 +283,16 @@ def _fingerprint(vacancy: Vacancy) -> tuple:
 # данных ведём на другую площадку.
 OPENNESS = {
     # Сайт самой компании — лучшее, куда можно привести: отклик напрямую.
-    **{key: 0 for key in ("yandex", "magnit", "mts", "tbank", "rwb", "vk", "sberdevices")},
+    **{key: 0 for key in ("yandex", "magnit", "mts", "tbank", "rwb", "vk",
+                          "sberdevices", "x5", "tochka", "alfa", "ats")},
     "hh": 1,
     "habr": 1,
     "careerspace": 1,
     "getmatch": 1,
     "designer": 1,
+    "finder": 1,
+    "linkedin": 1,
+    "friendwork": 1,
     "hirehi": 2,
     "telegram": 1,
 }
@@ -342,11 +365,18 @@ SOURCE_LABEL = {
     "hh": "hh.ru",
     "getmatch": "getmatch",
     "designer": "designer.ru",
+    "finder": "finder",
+    "linkedin": "LinkedIn",
+    "friendwork": "Skillbox",
     "yandex": "Yandex",
     "vk": "VK",
     "tbank": "Т-Банк",
     "mts": "МТС",
     "magnit": "Магнит",
+    "x5": "X5 Tech",
+    "tochka": "Точка",
+    "alfa": "Альфа-Банк",
+    "ats": "сайт компании",
     "rwb": "RWB",
     "sberdevices": "SberDevices",
     "telegram": "Telegram",
@@ -380,6 +410,8 @@ def _line(vacancy: Vacancy) -> str:
 
     label = SOURCE_LABEL.get(vacancy.source, vacancy.source)
     link = f'<a href="{_escape(vacancy.url)}">{label} ↗</a>'
+    if vacancy.company_url:
+        link += f' · <a href="{_escape(vacancy.company_url)}">сайт ↗</a>'
     line = _escape(" · ".join(f for f in facts if f))
     return f"▸ <b>{_escape(vacancy.title)}</b>\n   {line} · {link}"
 
@@ -409,8 +441,58 @@ def _grouped(vacancies: list[Vacancy], roles: list[str]) -> str:
     return "\n\n".join(blocks)
 
 
+PER_PAGE = 10
+
+
+def build_pages(vacancies: list[Vacancy], held_back: int = 0,
+                roles: list[str] | None = None,
+                per_page: int = PER_PAGE) -> list[str]:
+    """Дайджест страницами по per_page вакансий.
+
+    Длинная подборка раньше уходила простынёй на несколько сообщений подряд:
+    Telegram режет всё, что длиннее 4096 символов, и листать это невозможно.
+    Теперь страницы переключаются кнопками, а текст правится на месте.
+
+    Число в заголовке — общее по подборке, а не по странице: иначе человек
+    на второй странице думает, что вакансий всего десять.
+    """
+    if not vacancies:
+        return [build_digest(vacancies, held_back, roles)]
+
+    chunks = [
+        vacancies[start:start + per_page]
+        for start in range(0, len(vacancies), per_page)
+    ]
+    total = len(vacancies)
+    # Приписку про скрытые показываем один раз, на первой странице.
+    pages = [
+        build_digest(chunk, held_back if index == 0 else 0, roles, total=total)
+        for index, chunk in enumerate(chunks)
+    ]
+    if len(pages) > 1:
+        # Счётчик — строкой под списком, а не кнопкой: кнопка, которая
+        # ничего не делает, только сбивает с толку.
+        pages = [
+            f"{text}\n\nСтр. {index + 1}/{len(pages)}"
+            for index, text in enumerate(pages)
+        ]
+    return pages
+
+
+def digest_keyboard(index: int, pages: int) -> list[list[dict]] | None:
+    """Только навигация: на первой странице одна кнопка, дальше две."""
+    if pages <= 1:
+        return None
+    row = []
+    if index > 0:
+        row.append({"text": "← Назад", "callback_data": f"dg:{index - 1}"})
+    if index < pages - 1:
+        row.append({"text": "Далее →", "callback_data": f"dg:{index + 1}"})
+    return [row]
+
+
 def build_digest(vacancies: list[Vacancy], held_back: int = 0,
-                 roles: list[str] | None = None) -> str:
+                 roles: list[str] | None = None, total: int | None = None) -> str:
     """held_back — сколько вакансий скрыто из-за неназванного грейда.
     Молчать об этом нельзя: у тех, кто ищет стажировку, подборка выходит
     короткой, и без объяснения это неотличимо от поломки бота.
@@ -432,7 +514,8 @@ def build_digest(vacancies: list[Vacancy], held_back: int = 0,
     if not vacancies:
         return header + "\nСегодня ничего нового по твоим фильтрам." + note
 
-    header += f" · {len(vacancies)} " + _plural(len(vacancies))
+    counted = total if total is not None else len(vacancies)
+    header += f" · {counted} " + _plural(counted)
     # Заголовки групп нужны, только когда групп правда несколько: над
     # единственной пачкой заголовок — лишний шум.
     body = ""

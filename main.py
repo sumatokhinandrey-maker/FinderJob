@@ -28,8 +28,9 @@ sys.path.insert(0, str(ROOT))
 import core  # noqa: E402
 from finderjob import profile as prof  # noqa: E402
 from finderjob import stats, store, taxonomy, tg  # noqa: E402
-from sources import (careerspace, companies, designer, getmatch,  # noqa: E402
-                     habr, hh, hirehi, telegram)
+from sources import (ats, careerspace, companies, designer, finder,  # noqa: E402
+                     friendwork, getmatch, habr, hh, hirehi, linkedin,
+                     telegram)
 
 
 def load_env() -> None:
@@ -49,7 +50,7 @@ def load_env() -> None:
         os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
 
 
-def deliver(user: dict, vacancies: list, dry_run: bool) -> int:
+def deliver(user: dict, vacancies: list, dry_run: bool, cap: int = 0) -> int:
     """Готовим и отправляем дайджест одному человеку. Возвращаем,
     сколько вакансий ему ушло."""
     prof.migrate(user["profile"])
@@ -59,9 +60,25 @@ def deliver(user: dict, vacancies: list, dry_run: bool) -> int:
     seen = user.get("seen") or {}
     fresh = core.only_new(passed, seen)
 
-    digest = core.build_digest(
+    # Окно в месяц на первом прогоне даёт человеку сотни вакансий разом —
+    # это не подборка, а простыня на полтора десятка сообщений. Отдаём самое
+    # свежее, остальное не помечаем показанным: оно придёт следующими днями.
+    tail = 0
+    if cap and len(fresh) > cap:
+        fresh.sort(key=lambda v: v.posted_at, reverse=True)
+        fresh, tail = fresh[:cap], len(fresh) - cap
+
+    pages = core.build_pages(
         fresh, rejected.get("grade_unknown", 0), prof.roles_of(user["profile"])
     )
+    if tail:
+        # Приписку вешаем на последнюю страницу: она про то, что будет
+        # дальше, и читается в конце подборки, а не поверх неё.
+        pages[-1] += (
+            f"\n\nЕщё {tail} " + core._plural(tail)
+            + " — пришлю в следующие дни, чтобы не заваливать одним сообщением."
+        )
+    digest = pages[0]
     label = user.get("username") or user["chat_id"]
     breakdown = ", ".join(
         f"{core.REASONS.get(k, k)} {v}" for k, v in sorted(rejected.items())
@@ -74,7 +91,8 @@ def deliver(user: dict, vacancies: list, dry_run: bool) -> int:
     if dry_run:
         return len(fresh)
 
-    tg.send(user["chat_id"], digest)
+    store.save_digest(user["chat_id"], pages)
+    tg.send(user["chat_id"], digest, core.digest_keyboard(0, len(pages)))
     stats.track("digest_sent")
     stats.track("vacancies_sent", len(fresh))
 
@@ -134,6 +152,13 @@ def main() -> int:
     # Повторов это не создаёт — их отсекает память о показанном.
     windows = config.get("lookback_days_by_source") or {}
 
+    # Потолок страниц на источник. hirehi отдаёт каждую вакансию отдельной
+    # страницей, и после расширения на маркетинг, аналитику и менеджмент
+    # их стало 4011 за прогон (~100 минут) — рассылка перестала укладываться
+    # в сутки и 15.10.2026 не ушла вовсе. Страницы отсортированы по свежести,
+    # поэтому потолок режет хвост окна, а не сегодняшние вакансии.
+    caps = config.get("max_pages_by_source") or {}
+
     # Маршрутный лист: куда идти ради тех профессий, которые кто-нибудь
     # из подписчиков ищет. Раньше обход был слепым — все источники всегда,
     # а больше половины собранного выбрасывалось фильтром роли.
@@ -143,11 +168,15 @@ def main() -> int:
 
     print(f"Собираю вакансии с {since}…")
     vacancies = []
-    for name, key, source in (("hirehi", "hirehi", hirehi), ("habr", "habr", habr),
+    for name, key, source in (("hirehi", "hirehi", hirehi),
+                              ("finder", "finder", finder), ("habr", "habr", habr),
                               ("careerspace", "careerspace", careerspace),
                               ("hh", "hh", hh), ("getmatch", "getmatch", getmatch),
                               ("designer.ru", "designer", designer),
                               ("карьерные сайты", "companies", companies),
+                              ("доски компаний", "ats", ats),
+                              ("linkedin", "linkedin", linkedin),
+                              ("friend.work", "friendwork", friendwork),
                               ("telegram", "telegram", telegram)):
         own = windows.get(key)
         start = (date.today() - timedelta(days=own)).isoformat() if own else since
@@ -155,8 +184,10 @@ def main() -> int:
         if not plan:
             # Источник по этим профессиям ничего не отдаёт — ходить незачем.
             continue
+        extra = {"areas": config["hh_areas"]} if key == "hh" and config.get("hh_areas") else {}
         try:
-            found = source.collect(start, limit=args.limit, routes=plan)
+            found = source.collect(start, limit=args.limit or caps.get(key),
+                                   routes=plan, **extra)
         except Exception as exc:
             # Упавший источник не должен ронять рассылку целиком:
             # лучше дайджест по одной площадке, чем молчание.
@@ -193,7 +224,8 @@ def main() -> int:
     sent = 0
     for user in users:
         try:
-            sent += deliver(user, vacancies, args.dry_run)
+            sent += deliver(user, vacancies, args.dry_run,
+                            config.get("max_per_digest", 0))
         except Exception as exc:
             # Один упавший подписчик не должен ронять рассылку остальным.
             # Чаще всего это «bot was blocked by the user».
