@@ -28,8 +28,9 @@ sys.path.insert(0, str(ROOT))
 import core  # noqa: E402
 from finderjob import profile as prof  # noqa: E402
 from finderjob import stats, store, taxonomy, tg  # noqa: E402
-from sources import (careerspace, companies, designer, friendwork,  # noqa: E402
-                     getmatch, habr, hh, hirehi, telegram)
+from sources import (careerspace, companies, designer, finder,  # noqa: E402
+                     friendwork, getmatch, habr, hh, hirehi, linkedin,
+                     telegram)
 
 
 def load_env() -> None:
@@ -49,7 +50,7 @@ def load_env() -> None:
         os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
 
 
-def deliver(user: dict, vacancies: list, dry_run: bool) -> int:
+def deliver(user: dict, vacancies: list, dry_run: bool, cap: int = 0) -> int:
     """Готовим и отправляем дайджест одному человеку. Возвращаем,
     сколько вакансий ему ушло."""
     prof.migrate(user["profile"])
@@ -59,9 +60,22 @@ def deliver(user: dict, vacancies: list, dry_run: bool) -> int:
     seen = user.get("seen") or {}
     fresh = core.only_new(passed, seen)
 
+    # Окно в месяц на первом прогоне даёт человеку сотни вакансий разом —
+    # это не подборка, а простыня на полтора десятка сообщений. Отдаём самое
+    # свежее, остальное не помечаем показанным: оно придёт следующими днями.
+    tail = 0
+    if cap and len(fresh) > cap:
+        fresh.sort(key=lambda v: v.posted_at, reverse=True)
+        fresh, tail = fresh[:cap], len(fresh) - cap
+
     digest = core.build_digest(
         fresh, rejected.get("grade_unknown", 0), prof.roles_of(user["profile"])
     )
+    if tail:
+        digest += (
+            f"\n\nЕщё {tail} " + core._plural(tail)
+            + " — пришлю в следующие дни, чтобы не заваливать одним сообщением."
+        )
     label = user.get("username") or user["chat_id"]
     breakdown = ", ".join(
         f"{core.REASONS.get(k, k)} {v}" for k, v in sorted(rejected.items())
@@ -150,11 +164,13 @@ def main() -> int:
 
     print(f"Собираю вакансии с {since}…")
     vacancies = []
-    for name, key, source in (("hirehi", "hirehi", hirehi), ("habr", "habr", habr),
+    for name, key, source in (("hirehi", "hirehi", hirehi),
+                              ("finder", "finder", finder), ("habr", "habr", habr),
                               ("careerspace", "careerspace", careerspace),
                               ("hh", "hh", hh), ("getmatch", "getmatch", getmatch),
                               ("designer.ru", "designer", designer),
                               ("карьерные сайты", "companies", companies),
+                              ("linkedin", "linkedin", linkedin),
                               ("friend.work", "friendwork", friendwork),
                               ("telegram", "telegram", telegram)):
         own = windows.get(key)
@@ -201,7 +217,8 @@ def main() -> int:
     sent = 0
     for user in users:
         try:
-            sent += deliver(user, vacancies, args.dry_run)
+            sent += deliver(user, vacancies, args.dry_run,
+                            config.get("max_per_digest", 0))
         except Exception as exc:
             # Один упавший подписчик не должен ронять рассылку остальным.
             # Чаще всего это «bot was blocked by the user».

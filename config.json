@@ -1,5 +1,6 @@
 {
-  "lookback_days": 2,
+  "lookback_days": 30,
+  "max_per_digest": 40,
   "role": {
     "include_any": [
       "ux",

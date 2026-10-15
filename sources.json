@@ -88,6 +88,73 @@
         ]
       }
     },
+    "finder": {
+      "label": "finder",
+      "status": "connected",
+      "route_kind": "query",
+      "_note": "Маршрут — полнотекстовый запрос к api.finder.work. Запросы те же, что у hh, и не случайно: у всех проверенных записей external_url ведёт на hh.ru, то есть это тот же рынок, но без потолка в 20 свежих на запрос. robots их API запрещает всё, Андрей предупреждён 15.10.2026.",
+      "routes": {
+        "design.product": [
+          "продуктовый дизайнер",
+          "ux/ui дизайнер",
+          "дизайнер интерфейсов",
+          "product designer",
+          "ui дизайнер"
+        ],
+        "design.web": [
+          "веб-дизайнер"
+        ],
+        "design.graphic": [
+          "графический дизайнер"
+        ],
+        "design.motion": [
+          "моушн дизайнер"
+        ],
+        "content.copywriter": [
+          "копирайтер"
+        ],
+        "content.editor": [
+          "редактор"
+        ],
+        "content.smm": [
+          "smm-специалист",
+          "smm-менеджер"
+        ],
+        "content.maker": [
+          "контент-менеджер",
+          "контент-мейкер"
+        ],
+        "dev.frontend": [
+          "frontend разработчик",
+          "react разработчик"
+        ],
+        "dev.backend": [
+          "backend разработчик",
+          "python разработчик"
+        ],
+        "dev.mobile": [
+          "ios разработчик",
+          "android разработчик"
+        ],
+        "dev.fullstack": [
+          "fullstack разработчик"
+        ],
+        "dev.qa": [
+          "qa инженер",
+          "тестировщик"
+        ],
+        "product.manager": [
+          "продакт-менеджер"
+        ],
+        "product.analyst": [
+          "продуктовый аналитик",
+          "аналитик данных"
+        ],
+        "product.project": [
+          "проджект-менеджер"
+        ]
+      }
+    },
     "habr": {
       "label": "Хабр Карьера",
       "status": "connected",
@@ -220,6 +287,38 @@
         ],
         "product": [
           "*"
+        ]
+      }
+    },
+    "linkedin": {
+      "label": "LinkedIn",
+      "status": "connected",
+      "route_kind": "query",
+      "_note": "Маршрут — АНГЛИЙСКИЙ поисковый запрос: по России индекс пуст (location=Russia отдаёт ноль), кириллица не индексируется. Место всегда Worldwide, то есть это местный найм за рубежом, где нужно разрешение на работу — поэтому источник в core.OPT_IN_SOURCES и приходит только тому, кто выбрал его сам. Их соглашение сбор скриптами запрещает; с раннера GitHub Actions может не работать, LinkedIn режет адреса дата-центров.",
+      "routes": {
+        "design.product": [
+          "product designer"
+        ],
+        "design.web": [
+          "web designer"
+        ],
+        "design.graphic": [
+          "graphic designer"
+        ],
+        "design.motion": [
+          "motion designer"
+        ],
+        "dev.frontend": [
+          "frontend developer"
+        ],
+        "dev.backend": [
+          "backend developer"
+        ],
+        "product.analyst": [
+          "product analyst"
+        ],
+        "product.manager": [
+          "product manager"
         ]
       }
     },

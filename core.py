@@ -117,13 +117,14 @@ ENTRY_GRADES = {"intern", "junior"}
 
 # Карьерные сайты компаний: отклик идёт напрямую работодателю, без посредников
 # и регистраций, поэтому при склейке дублей они выигрывают у всех.
-COMPANY_SITES = {"yandex", "magnit", "mts", "tbank", "rwb", "vk", "sberdevices"}
+COMPANY_SITES = {"yandex", "magnit", "mts", "tbank", "rwb", "vk", "sberdevices",
+                 "x5", "tochka", "alfa"}
 
 # Площадки, которые приходят только тем, кто выбрал их сам. Обычная площадка
 # при пустом списке источников считается подходящей, но портал Skillbox
 # рассматривает отклик лишь с резюме по их шаблону: человеку со стороны такая
 # вакансия — обещание, которое бот выполнить не может.
-OPT_IN_SOURCES = {"friendwork"}
+OPT_IN_SOURCES = {"friendwork", "linkedin"}
 
 
 def _place_allowed(vacancy: Vacancy, rules: dict) -> bool:
@@ -277,12 +278,15 @@ def _fingerprint(vacancy: Vacancy) -> tuple:
 # данных ведём на другую площадку.
 OPENNESS = {
     # Сайт самой компании — лучшее, куда можно привести: отклик напрямую.
-    **{key: 0 for key in ("yandex", "magnit", "mts", "tbank", "rwb", "vk", "sberdevices")},
+    **{key: 0 for key in ("yandex", "magnit", "mts", "tbank", "rwb", "vk",
+                          "sberdevices", "x5", "tochka", "alfa")},
     "hh": 1,
     "habr": 1,
     "careerspace": 1,
     "getmatch": 1,
     "designer": 1,
+    "finder": 1,
+    "linkedin": 1,
     "friendwork": 1,
     "hirehi": 2,
     "telegram": 1,
@@ -356,12 +360,17 @@ SOURCE_LABEL = {
     "hh": "hh.ru",
     "getmatch": "getmatch",
     "designer": "designer.ru",
+    "finder": "finder",
+    "linkedin": "LinkedIn",
     "friendwork": "Skillbox",
     "yandex": "Yandex",
     "vk": "VK",
     "tbank": "Т-Банк",
     "mts": "МТС",
     "magnit": "Магнит",
+    "x5": "X5 Tech",
+    "tochka": "Точка",
+    "alfa": "Альфа-Банк",
     "rwb": "RWB",
     "sberdevices": "SberDevices",
     "telegram": "Telegram",

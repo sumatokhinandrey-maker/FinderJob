@@ -18,17 +18,64 @@
 
 from __future__ import annotations
 
+import functools
+import hashlib
 import json
 import re
+import ssl
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from html import unescape
+from pathlib import Path
 
 from core import Vacancy
 
-USER_AGENT = "Mozilla/5.0 (Macintosh) JobResearchBot/0.1 (personal job digest)"
+# --------------------------------------------------------------------------
+# сертификат НУЦ Минцифры
+# --------------------------------------------------------------------------
+#
+# Т-Банк, Альфа и Точка подписаны корнем «Russian Trusted Root CA», которого
+# нет в хранилище Python, — соединение рвалось ещё до запроса. Корень лежит
+# в репозитории и применяется ТОЛЬКО к этим трём хостам: доверять ему для
+# всего интернета нельзя, иначе любой сертификат, им выписанный, стал бы для
+# бота законным.
+#
+# Отпечаток сверен дважды: файл скачан с gu-st.ru (сайт Минцифры) и совпал
+# с корнем, который сам www.tbank.ru отдаёт в своей цепочке. Проверка ниже
+# держит это свойство: подменённый файл не подойдёт.
+CA_FILE = Path(__file__).resolve().parent.parent / "certs" / "russian_trusted_root_ca.pem"
+CA_SHA256 = "d26d2d0231b7c39f92cc738512ba54103519e4405d68b5bd703e9788ca8ecf31"
+RUSSIAN_CA_HOSTS = ("tbank.ru", "alfabank.ru", "tochka.com")
+
+
+@functools.lru_cache(maxsize=1)
+def _russian_ca_context() -> ssl.SSLContext | None:
+    try:
+        pem = CA_FILE.read_text("ascii")
+        digest = hashlib.sha256(ssl.PEM_cert_to_DER_cert(pem)).hexdigest()
+    except (OSError, ValueError) as exc:
+        print(f"  ! сертификат НУЦ не прочитан: {exc}")
+        return None
+    if digest != CA_SHA256:
+        print("  ! сертификат НУЦ не тот, каким был записан — не использую")
+        return None
+    context = ssl.create_default_context()
+    context.load_verify_locations(cafile=str(CA_FILE))
+    return context
+
+
+def _context_for(url: str) -> ssl.SSLContext | None:
+    host = (urllib.parse.urlsplit(url).hostname or "").lower()
+    if any(host == name or host.endswith("." + name) for name in RUSSIAN_CA_HOSTS):
+        return _russian_ca_context()
+    return None
+
+# Слова «bot» в строке быть не должно: career.rwb.ru режет такой запрос
+# по подстроке и отдаёт 403 в любом регистре. Проверено 15.10.2026 —
+# без него тот же адрес отвечает двумя сотнями и полусотней вакансий.
+USER_AGENT = "Mozilla/5.0 (Macintosh) jobresearch/0.1 (personal job digest)"
 DELAY_SEC = 0.4
 
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -52,8 +99,19 @@ def _fetch(url: str, body: dict | None = None, headers: dict | None = None,
     for attempt in range(tries):
         try:
             req = urllib.request.Request(url, data=data, headers=head)
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with urllib.request.urlopen(
+                req, timeout=timeout, context=_context_for(url)
+            ) as resp:
                 return resp.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as exc:
+            last = exc
+            # 403 и 404 повторять незачем — ответ не изменится. А вот 5xx
+            # у карьерных сайтов временны: VK 15.10.2026 отдавал 504
+            # и через минуту работал. Им даём паузу подлиннее.
+            if exc.code < 500 and exc.code != 429:
+                raise
+            if attempt < tries - 1:
+                time.sleep(3.0 * (attempt + 1))
         except Exception as exc:
             last = exc
             if attempt < tries - 1:
@@ -188,13 +246,23 @@ def tbank() -> list[Vacancy]:
 def rwb() -> list[Vacancy]:
     out = []
     data = _json("https://career.rwb.ru/crm-api/api/v1/pub/vacancies")
+    # Ответ приходит как {"data": {"items": [...]}}, но раньше адаптер видел
+    # только 403 и эту вложенность не проверял.
     items = data.get("data") if isinstance(data, dict) else data
+    if isinstance(items, dict):
+        items = items.get("items")
     for v in items or []:
+        # Формат лежит в employment_types списком словарей («Удаленно»,
+        # «Офис»), город — в city_title, у части вакансий он пуст.
+        modes = [
+            t.get("title") for t in v.get("employment_types") or [] if t
+        ]
         out.append(_make(
             "RWB (Wildberries & Russ)", "rwb", v.get("id"), v.get("name") or v.get("title"),
-            f"https://career.rwb.ru/vacancy/{v.get('id')}",
-            city=(v.get("city") or {}).get("name") if isinstance(v.get("city"), dict) else v.get("city"),
-            fmt=_format(v.get("workFormat"), v.get("schedule")),
+            f"https://career.rwb.ru/vacancies/{v.get('id')}",
+            city=_clean(v.get("city_title")) or None,
+            fmt=_format(*modes),
+            description=_clean(v.get("direction_title")),
         ))
     return out
 
@@ -275,8 +343,120 @@ def sberdevices() -> list[Vacancy]:
     return out
 
 
+def tochka() -> list[Vacancy]:
+    """Открытый JSON, двадцать вакансий целиком — пагинации нет.
+
+    Заработал 15.10.2026, когда в SSL-контекст лёг корень НУЦ: до этого
+    соединение рвалось и адаптера не было вовсе.
+    """
+    out = []
+    for v in _json("https://hr.tochka.com/api/v2/hr/vacancies/").get("items") or []:
+        slug = v.get("slug")
+        out.append(_make(
+            "Точка", "tochka", slug, v.get("title"),
+            v.get("customLink") or f"https://hr.tochka.com/vacancies/{slug}",
+            # «remotely» и «hybrid» — их собственные слова, _format их узнаёт
+            # по корню; город приходит отдельным полем лишь у части вакансий.
+            fmt=_format(v.get("workFormat")),
+            salary=v.get("salaryFrom") or None,
+            description=_clean((v.get("mainCategory") or {}).get("title")),
+        ))
+    return out
+
+
+def alfa() -> list[Vacancy]:
+    """Открытый JSON с постраничной выдачей.
+
+    Вакансий у банка больше двух тысяч, и почти все — не наши: операционисты,
+    продавцы, инкассаторы. Берём три свежие страницы и отдаём фильтру роли,
+    тащить весь банк ради десятка попаданий незачем.
+    """
+    out = []
+    for page in range(3):
+        data = _json(
+            "https://job.alfabank.ru/api/vacancies"
+            f"?take=100&skip={page * 100}"
+        )
+        items = data.get("items") or []
+        for v in items:
+            out.append(_make(
+                "Альфа-Банк", "alfa", v.get("id"), v.get("name"),
+                f"https://job.alfabank.ru/vacancies{v.get('slug') or ''}",
+                posted=v.get("createdAt") or "",
+            ))
+        if not items or (page + 1) * 100 >= (data.get("total") or 0):
+            break
+        time.sleep(DELAY_SEC)
+    return out
+
+
+def x5() -> list[Vacancy]:
+    """Вакансии вшиты в SSR-страницу экранированным JSON, как у 2ГИС.
+
+    Даты публикации сайт не отдаёт (`createdAt` пуст у всех), но карьерным
+    сайтам окно и не применяется — они и так показывают только открытое.
+    """
+    out = []
+    pages = 1
+    page = 1
+    while page <= min(pages, MAX_PAGES):
+        suffix = f"?page={page}" if page > 1 else ""
+        html = _fetch(f"https://x5.tech/vacancy{suffix}").replace('\\"', '"')
+        total = re.search(r'"totalPages":(\d+)', html)
+        if total:
+            pages = int(total.group(1))
+        for item in _embedded_objects(html):
+            formats = [
+                name for name, flag in (
+                    ("удалённо", item.get("isRemote")),
+                    ("гибрид", item.get("isHybrid")),
+                    ("офис", item.get("isOffice")),
+                ) if flag
+            ]
+            out.append(_make(
+                "X5 Tech", "x5", item.get("id"), item.get("name"),
+                f"https://x5.tech/vacancy/{item.get('id')}",
+                city=_clean(item.get("city")) or None,
+                fmt=_format(item.get("workFormat"), *formats),
+                description=" ".join(
+                    str(s) for s in (item.get("skills") or []) if s
+                ),
+            ))
+        page += 1
+        time.sleep(DELAY_SEC)
+    return out
+
+
+# Вакансии лежат в пейлоаде объектами вида {"id":"<uuid>","externalId":...}.
+# Вырезаем от якоря кусок, сбалансированный по фигурным скобкам: разбирать
+# весь пейлоад целиком не нужно, а регулярка на вложенный JSON развалится.
+_X5_ANCHOR_RE = re.compile(r'\{"id":"[0-9a-f-]{36}","externalId"')
+MAX_PAGES = 10
+
+
+def _embedded_objects(html: str) -> list[dict]:
+    found = []
+    for match in _X5_ANCHOR_RE.finditer(html):
+        depth = 0
+        for index in range(match.start(), len(html)):
+            if html[index] == "{":
+                depth += 1
+            elif html[index] == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        found.append(json.loads(html[match.start():index + 1]))
+                    except json.JSONDecodeError:
+                        pass
+                    break
+    return found
+
+
 ADAPTERS = {
     "yandex": yandex,
+    "x5": x5,
+    "tochka": tochka,
+    "alfa": alfa,
     "magnit": magnit,
     "mts": mts,
     "tbank": tbank,
