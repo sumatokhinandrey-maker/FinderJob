@@ -98,6 +98,12 @@ def handle_message(message: dict) -> None:
     if not chat.get("id"):
         return
 
+    # Команда своё дело сделала, в переписке от неё остаётся только мусор:
+    # ответ бота всё равно говорит, что произошло. Убираем сразу, до разбора,
+    # иначе на /stop и /start до удаления дело не дойдёт.
+    if text.startswith("/") and message.get("message_id"):
+        tg.delete(chat["id"], message["message_id"])
+
     if text.startswith("/stop"):
         store.forget_user(chat["id"])
         stats.track("stop")
