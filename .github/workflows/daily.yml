@@ -18,6 +18,10 @@ on:
         description: "Разослать, даже если сегодняшний дайджест уже ушёл"
         type: boolean
         default: false
+      probe:
+        description: "Только проверить источники с раннера и выйти"
+        type: boolean
+        default: false
 
 jobs:
   digest:
@@ -34,7 +38,15 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Адрес раннера виден источнику, а не нам: с домашней машины LinkedIn
+      # отвечает, а дата-центры он режет. Пока это не проверено отсюда,
+      # обсуждать настройки частоты не о чем.
+      - name: Проверить источники с раннера
+        if: inputs.probe
+        run: python3 -u probe_sources.py
+
       - name: Собрать и разослать дайджест
+        if: ${{ !inputs.probe }}
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
