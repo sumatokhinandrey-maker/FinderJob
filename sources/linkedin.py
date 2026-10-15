@@ -23,6 +23,7 @@
 
 from __future__ import annotations
 
+import random
 import re
 import time
 import urllib.error
@@ -49,6 +50,9 @@ QUERY_PAUSE_SEC = 5.0
 # 429 значит «подожди», а не «уходи»: один раз отступаем надолго и пробуем
 # снова, и только потом сдаёмся до следующего прогона.
 BACKOFF_SEC = 45.0
+# Два отступления — предел: если лимит держится и после них, источник
+# молчит до следующего прогона. Продавливать ограничение мы не будем.
+MAX_BACKOFFS = 2
 MAX_QUERIES = 3
 LOCATION = "Worldwide"
 
@@ -71,10 +75,12 @@ def _clean(match: re.Match | None) -> str:
     return " ".join(unescape(_TAG_RE.sub("", match.group(1))).split())
 
 
-def _fetch(query: str, start: int, since_days: int, timeout: int = 25) -> str:
+def _fetch(query: str, start: int, since_days: int, timeout: int = 25,
+           geo_id: str | None = None) -> str:
+    where = {"geoId": geo_id} if geo_id else {"location": LOCATION}
     params = urllib.parse.urlencode({
         "keywords": query,
-        "location": LOCATION,
+        **where,
         "f_TPR": f"r{since_days * 86400}",
         "start": str(start),
     })
@@ -82,6 +88,22 @@ def _fetch(query: str, start: int, since_days: int, timeout: int = 25) -> str:
                                  headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read().decode("utf-8", "replace")
+
+
+def _retry_after(exc: urllib.error.HTTPError, attempt: int) -> float:
+    """Сколько ждать после отказа.
+
+    Если сервис назвал срок в Retry-After — слушаемся его, своих догадок
+    тут быть не должно. Иначе удваиваем задержку и добавляем разброс, чтобы
+    несколько запросов не возвращались к нему одной пачкой.
+    """
+    header = exc.headers.get("Retry-After") if exc.headers else None
+    if header:
+        try:
+            return min(float(header), 120.0)
+        except ValueError:
+            pass
+    return BACKOFF_SEC * (2 ** attempt) * (0.7 + random.random() * 0.6)
 
 
 def parse_cards(html: str) -> list[Vacancy]:
@@ -129,20 +151,20 @@ def collect(since: str, limit: int | None = None,
 
     seen: set[str] = set()
     vacancies = []
-    backed_off = False
+    backed_off = 0
     for query in queries:
         for page in range(MAX_PAGES):
             try:
                 html = _fetch(query, page * PAGE, days)
             except urllib.error.HTTPError as exc:
-                if exc.code == 429 and not backed_off:
-                    # Первый отказ по частоте пережидаем: LinkedIn отпускает
-                    # через полминуты-минуту, и дальше прогон идёт нормально.
-                    backed_off = True
-                    print(f"  ! linkedin частит на «{query}» — жду {BACKOFF_SEC:.0f} с")
-                    time.sleep(BACKOFF_SEC)
+                if exc.code == 429 and backed_off < MAX_BACKOFFS:
+                    pause = _retry_after(exc, backed_off)
+                    backed_off += 1
+                    print(f"  ! linkedin просит подождать на «{query}» — "
+                          f"жду {pause:.0f} с")
+                    time.sleep(pause)
                     continue
-                note = " — отступать больше некуда" if exc.code == 429 else ""
+                note = " — ограничение устойчивое, прекращаю" if exc.code == 429 else ""
                 print(f"  ! linkedin не отдал «{query}»: HTTP {exc.code}{note}")
                 if exc.code in (429, 999):
                     return _sorted(vacancies, limit)

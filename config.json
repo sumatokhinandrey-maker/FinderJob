@@ -41,5 +41,6 @@
   },
   "max_pages_by_source": {
     "hirehi": 300
-  }
+  },
+  "hh_areas": [113, 40, 28, 97]
 }

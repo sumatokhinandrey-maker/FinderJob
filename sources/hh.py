@@ -36,6 +36,17 @@ DELAY_SEC = 5
 RETRIES = 2
 AREA_RUSSIA = 113
 
+# Площадки hh по странам. Русскоязычные вакансии живут не только в России:
+# после релокации их много в Казахстане, Грузии и Армении, и лента отдаёт
+# их так же. Проверено 15.10.2026 — по 20 записей на страну, с настоящими
+# русскими заголовками. Список переопределяется в config.json → hh_areas.
+AREAS = {
+    113: "Россия",
+    40: "Казахстан",
+    28: "Грузия",
+    97: "Армения",
+}
+
 # Что и в каком формате спрашиваем. Лента отдаёт 20 самых свежих на запрос
 # и не листается, поэтому запросов немного и каждый узкий.
 # Каждый запрос — свои 20 свежих, поэтому лишний запрос это лишние вакансии,
@@ -146,22 +157,34 @@ def parse_item(item: str, work_format: str) -> Vacancy | None:
 
 
 def collect(since: str, limit: int | None = None,
-            routes: list[str] | None = None) -> list[Vacancy]:
+            routes: list[str] | None = None,
+            areas: list[int] | None = None) -> list[Vacancy]:
     """Лента отдаёт 20 свежих на запрос и не листается, поэтому since здесь
-    не работает — новизну определяет память о показанном."""
+    не работает — новизну определяет память о показанном.
+
+    areas — страны: каждая отдаёт свои 20 свежих, то есть лишняя страна это
+    лишние вакансии, а не лишние страницы одной выдачи.
+    """
     seen: set[str] = set()
     vacancies: list[Vacancy] = []
     queries = routes or DEFAULT_ROUTES
-    requests = [(q, code, fmt) for q in queries for code, fmt in FORMATS.items()]
+    places = areas or [AREA_RUSSIA]
+    requests = [
+        (q, code, fmt, area)
+        for area in places
+        for q in queries
+        for code, fmt in FORMATS.items()
+    ]
 
-    for index, (query, code, work_format) in enumerate(requests):
+    for index, (query, code, work_format, area) in enumerate(requests):
         params = urllib.parse.urlencode(
-            {"text": query, "area": AREA_RUSSIA, "work_format": code}
+            {"text": query, "area": area, "work_format": code}
         )
         try:
             body = _fetch(f"{RSS}?{params}")
         except Exception as exc:
-            print(f"  ! hh не отдал «{query}» ({work_format}): {exc}")
+            place = AREAS.get(area, area)
+            print(f"  ! hh не отдал «{query}» ({work_format}, {place}): {exc}")
             continue
 
         for item in _ITEM_RE.findall(body):

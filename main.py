@@ -183,8 +183,10 @@ def main() -> int:
         if not plan:
             # Источник по этим профессиям ничего не отдаёт — ходить незачем.
             continue
+        extra = {"areas": config["hh_areas"]} if key == "hh" and config.get("hh_areas") else {}
         try:
-            found = source.collect(start, limit=args.limit or caps.get(key), routes=plan)
+            found = source.collect(start, limit=args.limit or caps.get(key),
+                                   routes=plan, **extra)
         except Exception as exc:
             # Упавший источник не должен ронять рассылку целиком:
             # лучше дайджест по одной площадке, чем молчание.
