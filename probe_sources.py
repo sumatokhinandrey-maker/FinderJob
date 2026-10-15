@@ -45,7 +45,26 @@ def main() -> int:
     except Exception as exc:
         print("адрес узнать не вышло:", exc, flush=True)
 
-    print("\n=== LinkedIn ===", flush=True)
+    print("\n=== LinkedIn: настоящий сбор нашим источником ===", flush=True)
+    try:
+        sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
+        from datetime import date, timedelta
+
+        from sources import linkedin as source
+
+        started = time.time()
+        found = source.collect(
+            (date.today() - timedelta(days=7)).isoformat(),
+            routes=["product designer", "web designer", "product analyst"],
+        )
+        print(f"   собрано {len(found)} за {time.time() - started:.0f} с", flush=True)
+        for vacancy in found[:5]:
+            print(f"     {vacancy.posted_at} | {vacancy.title[:38]} | {vacancy.company[:20]}",
+                  flush=True)
+    except Exception as exc:
+        print(f"   источник упал: {type(exc).__name__}: {exc}", flush=True)
+
+    print("\n=== LinkedIn: голый запрос ===", flush=True)
     # Три попытки с нарастающей паузой: 429 по частоте проходит сам,
     # а блок по адресу — нет, и это ровно то, что нужно различить.
     for attempt in range(1, 4):

@@ -37,12 +37,18 @@ API = ("https://www.linkedin.com/jobs-guest/jobs/api/"
 USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
               "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36")
 PAGE = 10
-MAX_PAGES = 4
-# LinkedIn чувствителен к частоте: у sasaki между страницами 800 мс, и с ними
-# он отвечает в семи прогонах из десяти, а 429 ловится в одном из десяти.
-DELAY_SEC = 0.8
-# Больше трёх запросов за прогон — лишний повод получить 429; у sasaki тот же
-# порог. Если ролей у подписчиков больше, берём первые три запроса.
+# Две страницы вместо четырёх: двадцати свежих на запрос хватает, а каждая
+# лишняя страница — лишний повод получить 429.
+MAX_PAGES = 2
+# Адрес раннера LinkedIn не режет — проверено 15.10.2026 прямо из Actions,
+# HTTP 200 с первой попытки. Упирались мы только в частоту: дюжина запросов
+# подряд с паузой 0,8 секунды давала 429 уже на втором слове. Поэтому ритм
+# медленный, он всё равно дешевле, чем молчащий источник.
+DELAY_SEC = 3.0
+QUERY_PAUSE_SEC = 5.0
+# 429 значит «подожди», а не «уходи»: один раз отступаем надолго и пробуем
+# снова, и только потом сдаёмся до следующего прогона.
+BACKOFF_SEC = 45.0
 MAX_QUERIES = 3
 LOCATION = "Worldwide"
 
@@ -123,15 +129,20 @@ def collect(since: str, limit: int | None = None,
 
     seen: set[str] = set()
     vacancies = []
+    backed_off = False
     for query in queries:
         for page in range(MAX_PAGES):
             try:
                 html = _fetch(query, page * PAGE, days)
             except urllib.error.HTTPError as exc:
-                # 429 значит «частим»: доливать запросы бессмысленно, в этот
-                # прогон источник молчит целиком. 999 LinkedIn отдаёт, когда
-                # не хочет видеть адрес дата-центра.
-                note = " — частим, в этот раз без LinkedIn" if exc.code == 429 else ""
+                if exc.code == 429 and not backed_off:
+                    # Первый отказ по частоте пережидаем: LinkedIn отпускает
+                    # через полминуты-минуту, и дальше прогон идёт нормально.
+                    backed_off = True
+                    print(f"  ! linkedin частит на «{query}» — жду {BACKOFF_SEC:.0f} с")
+                    time.sleep(BACKOFF_SEC)
+                    continue
+                note = " — отступать больше некуда" if exc.code == 429 else ""
                 print(f"  ! linkedin не отдал «{query}»: HTTP {exc.code}{note}")
                 if exc.code in (429, 999):
                     return _sorted(vacancies, limit)
@@ -150,7 +161,7 @@ def collect(since: str, limit: int | None = None,
             if len(cards) < PAGE:
                 break
             time.sleep(DELAY_SEC)
-        time.sleep(DELAY_SEC)
+        time.sleep(QUERY_PAUSE_SEC)
 
     return _sorted(vacancies, limit)
 
