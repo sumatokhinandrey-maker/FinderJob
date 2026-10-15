@@ -333,11 +333,12 @@
       "label": "Telegram",
       "status": "connected",
       "route_kind": "channel",
-      "_note": "Читаются через веб-ленту t.me/s/, без аккаунта и ключей. Каналы с выключенным предпросмотром (например @hr_breakfast_emergency) так не читаются — там ноль постов, нужен авторизованный клиент.",
+      "_note": "Читаются через веб-ленту t.me/s/, без аккаунта и ключей. Каналы с выключенным предпросмотром (например @hr_breakfast_emergency) так не читаются — там ноль постов, нужен авторизованный клиент. Проверка 15.10.2026: из восьми кандидатов (mydesignjob, uxui_jobs, vacancy_design, jobs_for_designer и др.) публичный предпросмотр открыт только у workindesign — остальные без авторизации не читаются вовсе.",
       "routes": {
         "design": [
           "designoffers",
-          "designhunters"
+          "designhunters",
+          "workindesign"
         ]
       }
     }
