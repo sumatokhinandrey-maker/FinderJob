@@ -37,5 +37,8 @@
     "designer": 21,
     "careerspace": 14,
     "getmatch": 14
+  },
+  "max_pages_by_source": {
+    "hirehi": 600
   }
 }
