@@ -1,0 +1,42 @@
+name: Сбор LinkedIn в запас
+
+# Отдельно от рассылки и редко — в этом вся суть. LinkedIn отвечает на
+# нечастые запросы и затыкается на плотных, поэтому ходим четыре раза
+# в сутки по две страны, а рассылка берёт уже накопленное.
+
+on:
+  schedule:
+    # Минуты некруглые: ровный верх часа у GitHub загружен сильнее.
+    - cron: "13 1 * * *"
+    - cron: "13 7 * * *"
+    - cron: "13 13 * * *"
+    - cron: "13 19 * * *"
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "Какие страны обойти (0–3)"
+        type: string
+        default: "0"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Собрать LinkedIn
+        env:
+          KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
+          KV_REST_API_TOKEN: ${{ secrets.KV_REST_API_TOKEN }}
+        run: |
+          # У расписания входов нет, поэтому очередь стран считаем из часа:
+          # 01→0, 07→1, 13→2, 19→3. При ручном запуске берём, что попросили.
+          SLOT="${{ inputs.slot }}"
+          if [ -z "$SLOT" ]; then SLOT=$(( ($(date -u +%H) - 1) / 6 )); fi
+          echo "Очередь стран: $SLOT"
+          python3 -u linkedin_sync.py --slot "$SLOT"

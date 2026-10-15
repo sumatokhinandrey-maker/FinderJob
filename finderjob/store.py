@@ -159,6 +159,45 @@ def load_pool() -> tuple[list[dict], str | None]:
     return data.get("rows") or [], data.get("collected_at")
 
 
+LINKEDIN_KEY = "finderjob:linkedin"
+
+
+def merge_linkedin(rows: list[dict], keep_days: int = 10) -> int:
+    """Копим вакансии LinkedIn между прогонами.
+
+    Ходить туда во время рассылки нельзя: он отвечает на редкие запросы, а
+    рассылка идёт сплошняком и ловит 429. Поэтому собираем отдельно и редко,
+    складывая найденное в общий запас, — к рассылке он уже накоплен.
+
+    Возвращаем, сколько записей оказалось новыми.
+    """
+    from datetime import date, timedelta
+
+    old = {row.get("id"): row for row in load_linkedin()}
+    before = len(old)
+    for row in rows:
+        if row.get("id"):
+            old[row["id"]] = row
+
+    edge = (date.today() - timedelta(days=keep_days)).isoformat()
+    fresh = [row for row in old.values() if (row.get("posted_at") or "") >= edge]
+
+    _command("SET", LINKEDIN_KEY, json.dumps(fresh, ensure_ascii=False),
+             "EX", keep_days * 24 * 3600)
+    return len(old) - before
+
+
+def load_linkedin() -> list[dict]:
+    raw = _command("GET", LINKEDIN_KEY)
+    if not raw:
+        return []
+    try:
+        rows = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    return rows if isinstance(rows, list) else []
+
+
 def save_digest(chat_id: int | str, pages: list[str]) -> None:
     """Страницы последнего дайджеста: по ним кнопки «Далее» и «Назад»
     перерисовывают сообщение. Живут неделю — к следующему дайджесту старые

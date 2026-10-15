@@ -56,6 +56,21 @@ MAX_BACKOFFS = 2
 MAX_QUERIES = 3
 LOCATION = "Worldwide"
 
+# Места задаём geoId, а не словами: строковые названия двусмысленны —
+# «Georgia» LinkedIn понимает как штат США и отдаёт Атланту, «Armenia»
+# как город в Колумбии. Каждый id сверен живой выдачей 15.10.2026; один
+# из проверявшихся (104282357, якобы Армения) отдал австрийский Линц
+# и в список не попал — ради этого сверка и делалась.
+GEO = {
+    "Worldwide": "92000000",
+    "Грузия": "106315325",
+    "Казахстан": "106049128",
+    "Сербия": "101855366",
+    "Кипр": "106774002",
+    "ОАЭ": "104305776",
+    "Турция": "102105699",
+}
+
 # Разбираем по карточкам-<li>, а не отдельными списками полей: у части
 # вакансий нет компании или даты, и при сопоставлении по позициям поля
 # разъезжаются — чужая компания приклеивается к чужому заголовку. Способ
@@ -140,10 +155,36 @@ def parse_cards(html: str) -> list[Vacancy]:
 
 def collect(since: str, limit: int | None = None,
             routes: list[str] | None = None) -> list[Vacancy]:
-    """routes — английские поисковые запросы: русские LinkedIn не находит."""
+    """Во время рассылки берём накопленный запас, а не ходим в LinkedIn.
+
+    Он отвечает на редкие запросы, а рассылка идёт сплошняком и ловит 429 —
+    поэтому собирает его отдельный прогон (`linkedin_sync.py`) несколько раз
+    в сутки. Если запаса нет, честно возвращаем пусто: лезть в сеть посреди
+    рассылки значит получить отказ и подвести всех остальных.
+    """
+    from core import from_rows
+    from finderjob import store
+
+    rows = [row for row in store.load_linkedin()
+            if (row.get("posted_at") or "") >= since]
+    if not rows:
+        print("  ! запас linkedin пуст — его наполняет отдельный прогон")
+        return []
+    return _sorted(from_rows(rows), limit)
+
+
+def fetch(since: str, limit: int | None = None,
+          routes: list[str] | None = None,
+          geo_ids: list[str] | None = None) -> list[Vacancy]:
+    """Настоящий обход LinkedIn. Зовётся только отдельным сборщиком.
+
+    routes — английские поисковые запросы: русские LinkedIn ищет плохо,
+    зато в странах релокации сам отдаёт вакансии с русскими заголовками.
+    """
     from datetime import date
 
     queries = list(dict.fromkeys(routes or []))[:MAX_QUERIES]
+    places = geo_ids or [GEO["Worldwide"]]
     try:
         days = max((date.today() - date.fromisoformat(since)).days, 1)
     except ValueError:
@@ -152,38 +193,40 @@ def collect(since: str, limit: int | None = None,
     seen: set[str] = set()
     vacancies = []
     backed_off = 0
-    for query in queries:
-        for page in range(MAX_PAGES):
-            try:
-                html = _fetch(query, page * PAGE, days)
-            except urllib.error.HTTPError as exc:
-                if exc.code == 429 and backed_off < MAX_BACKOFFS:
-                    pause = _retry_after(exc, backed_off)
-                    backed_off += 1
-                    print(f"  ! linkedin просит подождать на «{query}» — "
-                          f"жду {pause:.0f} с")
-                    time.sleep(pause)
-                    continue
-                note = " — ограничение устойчивое, прекращаю" if exc.code == 429 else ""
-                print(f"  ! linkedin не отдал «{query}»: HTTP {exc.code}{note}")
-                if exc.code in (429, 999):
-                    return _sorted(vacancies, limit)
-                break
-            except (urllib.error.URLError, TimeoutError) as exc:
-                print(f"  ! linkedin не отдал «{query}»: {exc}")
-                break
+    for geo_id in places:
+        for query in queries:
+            for page in range(MAX_PAGES):
+                try:
+                    html = _fetch(query, page * PAGE, days, geo_id=geo_id)
+                except urllib.error.HTTPError as exc:
+                    if exc.code == 429 and backed_off < MAX_BACKOFFS:
+                        pause = _retry_after(exc, backed_off)
+                        backed_off += 1
+                        print(f"  ! linkedin просит подождать на «{query}» — "
+                              f"жду {pause:.0f} с")
+                        time.sleep(pause)
+                        continue
+                    note = (" — ограничение устойчивое, прекращаю"
+                            if exc.code == 429 else "")
+                    print(f"  ! linkedin не отдал «{query}»: HTTP {exc.code}{note}")
+                    if exc.code in (429, 999):
+                        return _sorted(vacancies, limit)
+                    break
+                except (urllib.error.URLError, TimeoutError) as exc:
+                    print(f"  ! linkedin не отдал «{query}»: {exc}")
+                    break
 
-            cards = parse_cards(html)
-            for vacancy in cards:
-                if vacancy.id in seen:
-                    continue
-                seen.add(vacancy.id)
-                vacancies.append(vacancy)
+                cards = parse_cards(html)
+                for vacancy in cards:
+                    if vacancy.id in seen:
+                        continue
+                    seen.add(vacancy.id)
+                    vacancies.append(vacancy)
 
-            if len(cards) < PAGE:
-                break
-            time.sleep(DELAY_SEC)
-        time.sleep(QUERY_PAUSE_SEC)
+                if len(cards) < PAGE:
+                    break
+                time.sleep(DELAY_SEC)
+            time.sleep(QUERY_PAUSE_SEC)
 
     return _sorted(vacancies, limit)
 
