@@ -36,6 +36,13 @@ _FORMATS = {"remote": "remote", "office": "office", "hybrid": "hybrid"}
 # и скобкой; без скобки — до конца строки.
 _COMPANY_RE = re.compile(r"\sв\s+([^(]+?)\s*(?:\(|$)")
 _TAG_RE = re.compile(r"<[^>]+>")
+_HREF_RE = re.compile(r"""href=["']([^"']+)["']""")
+
+# Отклик на портале рассматривают только с резюме по шаблону Skillbox,
+# поэтому ищем в описании сайт работодателя — второй путь, написать напрямую.
+# Мимо идут облака с самими шаблонами, сам Skillbox и почтовые ссылки.
+_NOT_EMPLOYER = ("cloud.mail.ru", "drive.google.com", "docs.google.com",
+                 "skillbox", "friend.work", "t.me", "mailto")
 
 
 def _fetch(url: str, timeout: int = 30, tries: int = 2) -> dict:
@@ -54,6 +61,14 @@ def _fetch(url: str, timeout: int = 30, tries: int = 2) -> dict:
 def _plain(html: str) -> str:
     """Описание приходит разметкой — в фильтры и дайджест нужен текст."""
     return " ".join(unescape(_TAG_RE.sub(" ", html or "")).split())
+
+
+def _employer_site(html: str) -> str | None:
+    for url in _HREF_RE.findall(html or ""):
+        url = unescape(url).strip()
+        if url.startswith("http") and not any(bad in url.lower() for bad in _NOT_EMPLOYER):
+            return url
+    return None
 
 
 def parse_vacancy(token: str, item: dict) -> Vacancy | None:
@@ -88,6 +103,7 @@ def parse_vacancy(token: str, item: dict) -> Vacancy | None:
         experience_months=years * 12 if isinstance(years, int) else None,
         description=_plain(item.get("description") or ""),
         skills="",
+        company_url=_employer_site(item.get("description") or ""),
     )
 
 
@@ -132,7 +148,10 @@ if __name__ == "__main__":
         "expYearsMin": None,
         "workplaceType": "Remote",
         "publishDateTime": "2026-10-08T17:56:56.993",
-        "description": "<div>Разработчик игр <a href='x'>IMT</a>&nbsp;ищет</div>",
+        "description": (
+            "<div>Шаблон резюме <a href='https://cloud.mail.ru/public/x'>тут</a>. "
+            "Разработчик игр <a href='https://imt.games'>IMT</a>&nbsp;ищет</div>"
+        ),
     }
     v = parse_vacancy("skillbox", sample)
     assert v.id == "friendwork:125798", v.id
@@ -141,7 +160,11 @@ if __name__ == "__main__":
     assert v.work_format == "remote", v.work_format
     assert v.posted_at == "2026-10-08", v.posted_at
     assert v.url == "https://jobs.friend.work/skillbox/125798", v.url
-    assert v.description == "Разработчик игр IMT ищет", repr(v.description)
+    assert v.description.endswith("Разработчик игр IMT ищет"), repr(v.description)
+    # Шаблон резюме в облаке стоит в описании раньше сайта компании —
+    # берём именно сайт.
+    assert v.company_url == "https://imt.games", v.company_url
+    assert parse_vacancy("skillbox", dict(sample, description="нет ссылок")).company_url is None
 
     no_brackets = dict(sample, title="Стажировка для дизайнеров в Виноу")
     assert parse_vacancy("skillbox", no_brackets).company == "Виноу"

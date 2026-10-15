@@ -30,6 +30,11 @@ class Vacancy:
     experience_months: int | None
     description: str
     skills: str
+    # Сайт работодателя, когда площадка его называет. У портала Skillbox
+    # отклик требует резюме по их шаблону, и сайт компании — второй путь:
+    # написать напрямую. Поле со значением по умолчанию, иначе записи,
+    # сохранённые в запас прежней версией, не прочитаются обратно.
+    company_url: str | None = None
 
     def haystack(self) -> str:
         """Всё текстовое одной строкой — по нему ищем стоп- и ключевые слова."""
@@ -390,6 +395,8 @@ def _line(vacancy: Vacancy) -> str:
 
     label = SOURCE_LABEL.get(vacancy.source, vacancy.source)
     link = f'<a href="{_escape(vacancy.url)}">{label} ↗</a>'
+    if vacancy.company_url:
+        link += f' · <a href="{_escape(vacancy.company_url)}">сайт ↗</a>'
     line = _escape(" · ".join(f for f in facts if f))
     return f"▸ <b>{_escape(vacancy.title)}</b>\n   {line} · {link}"
 
