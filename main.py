@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT))
 
 import core  # noqa: E402
 from finderjob import profile as prof  # noqa: E402
-from finderjob import stats, store, taxonomy, tg  # noqa: E402
+from finderjob import stats, store, taxonomy, tg, wizard  # noqa: E402
 from sources import (ats, careerspace, companies, designer, finder,  # noqa: E402
                      friendwork, getmatch, habr, hh, hirehi, linkedin,
                      telegram)
@@ -93,6 +93,12 @@ def deliver(user: dict, vacancies: list, dry_run: bool, cap: int = 0) -> int:
 
     store.save_digest(user["chat_id"], pages)
     tg.send(user["chat_id"], digest, core.digest_keyboard(0, len(pages)))
+    if not user.get("menu_installed"):
+        try:
+            tg.send(user["chat_id"], "Меню", wizard.menu_keyboard())
+            user["menu_installed"] = True
+        except RuntimeError as exc:
+            print(f"    ! не удалось установить клавиатуру фильтров: {exc}")
     stats.track("digest_sent")
     stats.track("vacancies_sent", len(fresh))
 
