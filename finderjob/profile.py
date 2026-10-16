@@ -81,16 +81,6 @@ def new_user(chat_id: int, username: str | None, today: str) -> dict:
     }
 
 
-def needs_region(profile: dict) -> bool:
-    """Регион имеет смысл, только если человек готов куда-то ездить.
-    Пустой список форматов — это «пропущено», то есть офис и гибрид тоже
-    подходят, и место снова важно."""
-    formats = profile.get("formats") or []
-    if not formats:
-        return True
-    return "hybrid" in formats or "office" in formats
-
-
 def step_filled(profile: dict, step: str) -> bool:
     """Выбрано ли хоть что-то на шаге. Пока не выбрано, «Далее» ничем
     не отличается от «Пропустить», поэтому его не показываем."""
@@ -220,6 +210,7 @@ def describe_roles(profile: dict) -> str:
 
     roles = roles_of(profile)
     display = {
+        "design.product_designer": "Продуктовый дизайнер",
         "design.product": "UX/UI-дизайнер",
         "design.graphic": "Графический дизайнер",
         "design.web": "Веб-дизайнер",
@@ -238,8 +229,6 @@ def describe_roles(profile: dict) -> str:
 
 
 def describe_regions(profile: dict) -> str:
-    if not needs_region(profile):
-        return "не спрашиваем, ты выбрал только удалёнку"
     return _named(profile.get("regions") or [], REGIONS)
 
 
@@ -272,15 +261,12 @@ def summary(profile: dict) -> str:
     formats = profile.get("formats") or [value for value, _ in FORMATS]
     format_labels = {"remote": "удалёнка", "hybrid": "гибрид", "office": "офис"}
     work = ", ".join(format_labels[value] for value in formats if value in format_labels)
-    if not needs_region(profile):
-        region = "не нужен для удалённой работы"
-    else:
-        region_labels = {"ru": "РФ", "cis": "СНГ", "abroad": "зарубежье"}
-        region = ", ".join(
-            region_labels[value]
-            for value in profile.get("regions") or []
-            if value in region_labels
-        ) or "любой"
+    region_labels = {"ru": "РФ", "cis": "СНГ", "abroad": "зарубежье"}
+    region = ", ".join(
+        region_labels[value]
+        for value in profile.get("regions") or []
+        if value in region_labels
+    ) or "любой"
 
     body = (
         "<b>Фильтры</b>\n\n"

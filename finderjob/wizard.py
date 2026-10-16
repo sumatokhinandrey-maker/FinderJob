@@ -20,7 +20,6 @@ STEPS = ["direction", "role", "grade", "salary", "format", "region"]
 # Слово согласуется с существительным шага: «Зарплата — любая», но
 # «Формат работы — любой». У grade и direction кнопки нет вовсе.
 SKIP_LABEL = {
-    "role": "Выбрать всё",
     "salary": "Любая",
     "format": "Выбрать всё",
     "region": "Любой",
@@ -74,7 +73,7 @@ QUESTIONS = {
     "format": "<b>Шаг 5 из 6. Формат</b>\n\nГде готов работать? Можно выбрать несколько.",
     "region": (
         "<b>Шаг 6 из 6. Регион</b>\n\n"
-        "В каких регионах искать вакансии с офисом или гибридом?"
+        "В каких регионах искать вакансии? Можно выбрать несколько."
     ),
     "sources": (
         "<b>Источники</b>\n\nИсточники вакансий. "
@@ -117,16 +116,14 @@ def _toggle_from_all(profile: dict, field: str, value: str, everything: list[str
 
 
 def next_step(step: str, profile: dict) -> str | None:
-    order = [name for name in STEPS if name != "region" or prof.needs_region(profile)]
-    following = order[order.index(step) + 1 :] if step in order else []
+    following = STEPS[STEPS.index(step) + 1 :] if step in STEPS else []
     return following[0] if following else None
 
 
 def prev_step(step: str, profile: dict) -> str | None:
-    order = [name for name in STEPS if name != "region" or prof.needs_region(profile)]
-    if step not in order:
+    if step not in STEPS:
         return None
-    earlier = order[: order.index(step)]
+    earlier = STEPS[: STEPS.index(step)]
     return earlier[-1] if earlier else None
 
 
@@ -180,7 +177,7 @@ def keyboard(step: str, profile: dict, mode: str) -> list[list[dict]]:
                 buttons.append(
                     _button(f"{CHECK if full in chosen else ''}{body['label']}", f"tr:{full}")
                 )
-        return _rows(buttons) + _tail(step, profile, mode)
+        return _rows(buttons) + [[_button("Выбрать всё", "all:role")]] + _tail(step, profile, mode)
 
     if step == "region":
         # Пустой список означает «подходит любой», и показывать его пустым
@@ -282,15 +279,7 @@ def input_keyboard(step: str) -> list[list[dict]]:
 
 def render(step: str, profile: dict, mode: str) -> tuple[str, list[list[dict]]]:
     body = QUESTIONS[step]
-    order = [name for name in STEPS if name != "region" or prof.needs_region(profile)]
-    if mode == "setup" and step in order:
-        body = re.sub(
-            r"Шаг \d+ из \d+",
-            f"Шаг {order.index(step) + 1} из {len(order)}",
-            body,
-            count=1,
-        )
-    else:
+    if mode != "setup":
         body = re.sub(r"Шаг \d+ из \d+[.·] ", "", body, count=1)
     return body, keyboard(step, profile, mode)
 
@@ -336,11 +325,7 @@ def _toggle(items: list, value: str) -> None:
 
 
 def skip(step: str, profile: dict) -> None:
-    """«Любая»/«Любой» — стереть критерий этого шага.
-
-    На шаге ролей это значит «все роли выбранных направлений»: пустой
-    список ролей означал бы поиск вообще без профессии.
-    """
+    """«Любая»/«Любой» — стереть критерий этого шага."""
     if step == "role":
         profile["roles"] = [
             f"{direction}.{role}"
@@ -356,7 +341,9 @@ def apply(data: str, user: dict) -> str | None:
     """Применяем нажатие к профилю. Переходы между шагами делает вызывающий."""
     profile = user["profile"]
 
-    if data.startswith("td:"):
+    if data == "all:role":
+        skip("role", profile)
+    elif data.startswith("td:"):
         # Направления храним отдельно, чтобы выбор роли был самостоятельным шагом.
         direction = data[3:]
         directions = prof.directions_of(profile)

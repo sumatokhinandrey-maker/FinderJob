@@ -133,23 +133,18 @@ OPT_IN_SOURCES = {"friendwork"}
 
 
 def _place_allowed(vacancy: Vacancy, rules: dict) -> bool:
-    """Регион подходит? Касается только гибрида и офиса — на удалёнку не влияет.
-
-    Три корзины: Россия, СНГ, зарубежные. Пусто — шаг пропущен, подходит всё.
-    """
+    """Регион подходит? Для выбранной удалёнки без известного места не угадываем."""
     regions = rules.get("regions") or []
     if not regions:
         return True
 
     if not vacancy.city:
-        # Город не указан вовсе — не угадываем, решать будет человек.
-        return True
+        return vacancy.work_format != "remote"
 
     where = geo.where(vacancy.city)
     if where is None:
-        # Незнакомый город: в какой он корзине, мы не знаем, поэтому
-        # не отсекаем. Лучше лишняя строка, чем потерянная вакансия.
-        return True
+        # Удалёнку с неизвестным местом нельзя назвать зарубежной.
+        return vacancy.work_format != "remote"
     return where in regions
 
 
@@ -192,13 +187,18 @@ def check(vacancy: Vacancy, profile: dict) -> str | None:
             return "source"
 
     formats = profile.get("work_formats", {})
-    if vacancy.work_format == "remote" and not formats.get("remote", True):
-        return "format"
+    if vacancy.work_format == "remote":
+        if not formats.get("remote", True) or not _place_allowed(vacancy, formats):
+            return "format"
     if vacancy.work_format in ("hybrid", "office"):
         if not formats.get(vacancy.work_format, True):
             return "format"
         if not _place_allowed(vacancy, formats):
             return "format"
+    if vacancy.work_format == "unknown" and formats.get("remote", True) and not (
+        formats.get("hybrid", True) or formats.get("office", True)
+    ):
+        return "format"
 
     # Вилку указывает примерно каждая десятая вакансия. У остальных
     # salary is None, и они проходят — иначе отсечётся почти всё.

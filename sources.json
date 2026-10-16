@@ -28,6 +28,13 @@
       "status": "connected",
       "route_kind": "query",
       "routes": {
+        "design.product_designer": [
+          "продуктовый дизайнер",
+          "ux/ui дизайнер",
+          "дизайнер интерфейсов",
+          "product designer",
+          "ui дизайнер"
+        ],
         "design.product": [
           "продуктовый дизайнер",
           "ux/ui дизайнер",
@@ -148,6 +155,13 @@
       "route_kind": "query",
       "_note": "Маршрут — полнотекстовый запрос к api.finder.work. Запросы те же, что у hh, и не случайно: у всех проверенных записей external_url ведёт на hh.ru, то есть это тот же рынок, но без потолка в 20 свежих на запрос. robots их API запрещает всё, Андрей предупреждён 15.10.2026.",
       "routes": {
+        "design.product_designer": [
+          "продуктовый дизайнер",
+          "ux/ui дизайнер",
+          "дизайнер интерфейсов",
+          "product designer",
+          "ui дизайнер"
+        ],
         "design.product": [
           "продуктовый дизайнер",
           "ux/ui дизайнер",
@@ -303,6 +317,10 @@
       "status": "connected",
       "route_kind": "specialization",
       "routes": {
+        "design.product_designer": [
+          "product_design",
+          "ux_writer"
+        ],
         "design.product": [
           "product_design",
           "ux_writer"
@@ -359,6 +377,9 @@
       "status": "connected",
       "route_kind": "collection",
       "routes": {
+        "design.product_designer": [
+          "ux_ui"
+        ],
         "design.product": [
           "ux_ui"
         ],
@@ -423,6 +444,9 @@
       "route_kind": "query",
       "_note": "Маршрут — АНГЛИЙСКИЙ поисковый запрос: по России индекс пуст (location=Russia отдаёт ноль), кириллица не индексируется. Место всегда Worldwide, то есть это местный найм за рубежом, где нужно разрешение на работу — поэтому источник в core.OPT_IN_SOURCES и приходит только тому, кто выбрал его сам. Их соглашение сбор скриптами запрещает; с раннера GitHub Actions может не работать, LinkedIn режет адреса дата-центров.",
       "routes": {
+        "design.product_designer": [
+          "product designer"
+        ],
         "design.product": [
           "product designer"
         ],

@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import traceback
+from copy import deepcopy
 from datetime import date
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
@@ -98,6 +99,17 @@ def _show(user: dict, body: str, keyboard: list) -> None:
 def _user(chat: dict) -> dict:
     existing = store.load_user(chat["id"])
     if existing:
+        # Старые настроенные профили хранили пустые роли как UX/UI + веб.
+        # Делаем этот фактический выбор явным, чтобы галочки совпадали с поиском.
+        configured = existing.get("setup_complete") or (
+            existing.get("mode") != "setup" and (existing.get("profile") or {}).get("grades")
+        )
+        if configured and not existing["profile"].get("roles"):
+            existing["profile"]["roles"] = list(prof.DEFAULT_ROLES)
+            directions = prof.directions_of(existing["profile"])
+            if "design" not in directions:
+                directions.append("design")
+            existing["profile"]["directions"] = directions
         return existing
     return prof.new_user(
         chat["id"], chat.get("username"), date.today().isoformat()
@@ -108,20 +120,21 @@ def _configured(user: dict) -> bool:
     return bool(user.get("setup_complete") or (user.get("profile") or {}).get("grades"))
 
 
-def _ensure_menu_keyboard(user: dict, chat_id: int) -> None:
-    if user.get("menu_installed"):
+def _ensure_menu_keyboard(user: dict, chat_id: int, force: bool = False) -> None:
+    if user.get("menu_installed") and not force:
         return
     tg.send(chat_id, wizard.MENU_PROMPT, wizard.menu_keyboard())
     user["menu_installed"] = True
 
 
 def _show_filters(user: dict, chat_id: int, install_menu: bool = False) -> None:
+    user.pop("draft_profile", None)
     user["awaiting"] = None
     user["mode"] = "edit"
     user["step"] = None
     body, keyboard = wizard.render_settings(user["profile"])
     if install_menu or not user.get("menu_installed"):
-        _ensure_menu_keyboard(user, chat_id)
+        _ensure_menu_keyboard(user, chat_id, force=install_menu)
     tg.send(chat_id, body, keyboard)
     user["menu_installed"] = True
     store.save_user(user)
@@ -149,9 +162,9 @@ def handle_message(message: dict) -> None:
     if text.startswith("/start"):
         stats.track("start")
         if _configured(user):
-            _show_filters(user, chat["id"], not user.get("menu_installed"))
+            _show_filters(user, chat["id"], install_menu=True)
         elif user.get("step"):
-            _ensure_menu_keyboard(user, chat["id"])
+            _ensure_menu_keyboard(user, chat["id"], force=True)
             _open_step(user, user["step"], "setup")
         else:
             tg.send(chat["id"], wizard.WELCOME, wizard.menu_keyboard())
@@ -161,11 +174,11 @@ def handle_message(message: dict) -> None:
 
     if text in ("Фильтры", "/filters", "/settings"):
         if not _configured(user):
-            _ensure_menu_keyboard(user, chat["id"])
+            _ensure_menu_keyboard(user, chat["id"], force=text.startswith("/"))
             _open_step(user, user.get("step") or "direction", "setup")
             return
         stats.track("settings")
-        _show_filters(user, chat["id"], not user.get("menu_installed"))
+        _show_filters(user, chat["id"], install_menu=text.startswith("/"))
         return
 
     if user.get("awaiting") and not text.startswith("/"):
@@ -214,10 +227,11 @@ def handle_callback(callback: dict) -> None:
         return
 
     user = _user(chat)
-    profile = prof.migrate(user["profile"])
+    profile = prof.migrate(user.get("draft_profile") or user["profile"])
     message_id = message.get("message_id")
 
     if data == "filters:close":
+        user.pop("draft_profile", None)
         user["card"] = None
         user["step"] = None
         user["awaiting"] = None
@@ -232,6 +246,7 @@ def handle_callback(callback: dict) -> None:
     notice = ""
 
     if data == "onb:start":
+        user.pop("draft_profile", None)
         user["profile"] = profile = prof.blank()
         user["mode"] = "setup"
         user["setup_complete"] = False
@@ -239,6 +254,7 @@ def handle_callback(callback: dict) -> None:
         body, keyboard = wizard.render("direction", profile, "setup")
 
     elif data == "search:find":
+        user.pop("draft_profile", None)
         user["setup_complete"] = True
         user["pending_first_search"] = False
         user["mode"] = "edit"
@@ -248,16 +264,20 @@ def handle_callback(callback: dict) -> None:
         stats.track("wizard_done")
 
     elif data == "search:edit":
+        user.pop("draft_profile", None)
         user["mode"] = "edit"
         user["step"] = None
         body, keyboard = wizard.render_settings(profile)
 
     elif data == "ed:menu":
+        user.pop("draft_profile", None)
+        profile = user["profile"]
         user["mode"] = "edit"
         user["step"] = None
         body, keyboard = wizard.render_settings(profile)
 
     elif data == "ed:more":
+        user["draft_profile"] = profile = deepcopy(user["profile"])
         user["mode"] = "edit"
         user["step"] = "sources"
         body, keyboard = wizard.render_more(profile)
@@ -276,6 +296,7 @@ def handle_callback(callback: dict) -> None:
         body, keyboard = wizard.render_settings(profile)
 
     elif data == "reset:confirm":
+        user.pop("draft_profile", None)
         user["profile"] = profile = prof.blank()
         user["setup_complete"] = False
         user["pending_first_search"] = False
@@ -285,6 +306,7 @@ def handle_callback(callback: dict) -> None:
         body, keyboard = wizard.render("direction", profile, "setup")
 
     elif data.startswith("ed:"):
+        user["draft_profile"] = profile = deepcopy(user["profile"])
         user["mode"] = "edit"
         user["step"] = data[3:]
         if user["step"] == "more":
@@ -303,6 +325,8 @@ def handle_callback(callback: dict) -> None:
         # В режиме правки «Назад» уводит в список настроек, а не на шаг раньше:
         # человек пришёл поменять один пункт, а не проходить мастер заново.
         if user.get("mode") == "edit":
+            user.pop("draft_profile", None)
+            profile = user["profile"]
             user["step"] = None
             body, keyboard = wizard.render_settings(profile)
         else:
@@ -311,7 +335,7 @@ def handle_callback(callback: dict) -> None:
             body, keyboard = wizard.render(earlier, profile, "setup")
 
     elif data.startswith("nx:") or data.startswith("sk:"):
-        wizard.apply(data, user)
+        wizard.apply(data, {"profile": profile})
         step = data[3:]
         user["awaiting"] = None
         if user.get("mode") == "edit":
@@ -319,11 +343,15 @@ def handle_callback(callback: dict) -> None:
                 user["step"] = "role"
                 body, keyboard = wizard.render("role", profile, "edit")
             elif user.get("pending_first_search"):
+                user["profile"] = profile
+                user.pop("draft_profile", None)
                 user["mode"] = "review"
                 user["step"] = None
                 body = prof.summary(profile) + "\n\n" + wizard.REVIEW_PROMPT
                 keyboard = wizard.done_keyboard()
             else:
+                user["profile"] = profile
+                user.pop("draft_profile", None)
                 user["step"] = None
                 edited = True
                 body, keyboard = wizard.render_settings(profile)
@@ -339,7 +367,9 @@ def handle_callback(callback: dict) -> None:
                 user["mode"] = "review"
 
     else:
-        notice = wizard.apply(data, user)
+        if user.get("mode") == "edit" and user.get("draft_profile"):
+            profile = user["draft_profile"]
+        notice = wizard.apply(data, {"profile": profile})
         step = user.get("step") or "direction"
         body, keyboard = wizard.render(step, profile, user.get("mode", "setup"))
 

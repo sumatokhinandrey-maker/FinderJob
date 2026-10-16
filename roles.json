@@ -4,6 +4,19 @@
     "design": {
       "label": "Дизайн",
       "roles": {
+        "product_designer": {
+          "label": "Продуктовый",
+          "include": [
+            "продуктовый дизайнер",
+            "product designer",
+            "дизайнер продукт",
+            "продуктового дизайн"
+          ],
+          "exclude": [
+            "мебел",
+            "интерьер"
+          ]
+        },
         "product": {
           "label": "UX/UI",
           "include": [
