@@ -10,10 +10,12 @@
 
 from __future__ import annotations
 
+import re
+
 from finderjob import profile as prof
 from finderjob import taxonomy
 
-STEPS = ["direction", "role", "grade", "salary", "format"]
+STEPS = ["direction", "role", "grade", "salary", "format", "region"]
 
 # Слово согласуется с существительным шага: «Зарплата — любая», но
 # «Формат работы — любой». У grade и direction кнопки нет вовсе.
@@ -27,19 +29,45 @@ SKIP_LABEL = {
 
 CHECK = "✓ "  # галочка перед выбранным пунктом
 
+CUSTOM_EMOJI_IDS = {
+    "⚡️": "5843553939672274145",
+    "💎": "5807465992363710697",
+    "💼": "5967389567781703494",
+}
+
+SOURCE_GROUPS = {
+    "companies": {"label": "Сайты компаний", "sources": ["companies", "ats"]},
+    "aggregators": {
+        "label": "Агрегаторы",
+        "sources": ["hirehi", "finder", "habr", "getmatch", "careerspace", "designer"],
+    },
+    "hh": {"label": "HH.RU", "sources": ["hh"]},
+    "telegram": {"label": "Telegram", "sources": ["telegram"]},
+    "linkedin": {"label": "LinkedIn", "sources": ["linkedin"]},
+}
+
 # Описание бота — то, что видно в пустом чате до кнопки «Начать».
 # Ставится через setup_bot.py, здесь лежит как источник правды.
 DESCRIPTION = "Твой персональный дайджест актуальных вакансий на каждый день"
+WELCOME = (
+    "Привет! Я FinderJob. Каждый день присылаю вакансии по твоим критериям "
+    "в 9:00 по Москве.\n\nНастроим подборку за пару минут?"
+)
 
 COMMANDS = [
-    ("start", "перезапустить бота"),
-    ("settings", "открыть фильтры"),
+    ("start", "настроить подборку"),
+    ("stop", "отписаться от дайджеста"),
+]
+
+CONFIGURED_COMMANDS = [
+    ("filters", "посмотреть и изменить фильтры"),
+    ("stop", "отписаться от дайджеста"),
 ]
 
 DONE = (
     "Критерии сохранены. Дальше дайджест будет приходить сам, "
     "каждый день в 9 утра по Москве.\n\n"
-    "Поменять критерии — /settings."
+    "Изменить их можно кнопкой «Фильтры» внизу."
 )
 
 EMPTY_POOL = (
@@ -50,8 +78,8 @@ EMPTY_POOL = (
 
 HELP = (
     "<b>FinderJob</b> присылает ежедневный дайджест вакансий для дизайнеров.\n\n"
-    "/start — начать заново\n"
-    "/settings — посмотреть и поменять критерии\n"
+    "/start — настроить подборку\n"
+    "/filters — посмотреть и изменить фильтры\n"
     "/stop — отписаться от дайджеста\n\n"
     "Вакансии беру с hirehi, hh.ru, Хабр Карьеры, getmatch, careerspace, "
     "designer.ru и карьерных сайтов компаний. Профессию выбираешь сам — "
@@ -63,20 +91,19 @@ HELP = (
 SALARY_STEPS = [100_000, 150_000, 200_000, 250_000]
 
 QUESTIONS = {
-    "direction": "<b>Шаг 1 из 5. Направление</b>\n\nЧем занимаешься.",
-    "role": "<b>Шаг 2 из 5. Роль</b>",
-    "grade": "<b>Шаг 3 из 5. Грейд</b>",
+    "direction": "<b>Шаг 1 из 6. Направление</b>\n\nЧем занимаешься? Можно выбрать несколько.",
+    "role": "<b>Шаг 2 из 6. Роли</b>\n\nКакие вакансии присылать? Можно выбрать несколько.",
+    "grade": "<b>Шаг 3 из 6. Грейд</b>\n\nОтметь подходящие уровни. Можно выбрать несколько.",
     "salary": (
-        "<b>Шаг 4 из 5. Зарплата</b>\n\n"
-        "Нижняя граница. Вакансии без указанной вилки не отсекаю — "
-        "их большинство."
+        "<b>Шаг 4 из 6. Вилка</b>\n\n"
+        "Выбери минимальную зарплату. Вакансии без указанной вилки останутся."
     ),
-    "format": "<b>Шаг 5 из 5. Формат работы</b>",
-    "region": (
-        "<b>Регион</b>\n\n"
-        "Где готов ездить в офис. На удалённые вакансии не влияет."
+    "format": "<b>Шаг 5 из 6. Формат</b>\n\nГде готов работать? Можно выбрать несколько.",
+    "region": "<b>Шаг 6 из 6. Регион</b>\n\nГде готов ездить в офис или работать гибридно?",
+    "sources": (
+        "<b>Дополнительно</b>\n\nИсточники вакансий. "
+        "По умолчанию включены все подключённые источники."
     ),
-    "sources": "<b>Источники</b>\n\nОткуда брать вакансии.",
 }
 
 
@@ -114,15 +141,17 @@ def _toggle_from_all(profile: dict, field: str, value: str, everything: list[str
 
 
 def next_step(step: str, profile: dict) -> str | None:
-    order = STEPS[STEPS.index(step) + 1 :] if step in STEPS else []
-    return order[0] if order else None
+    order = [name for name in STEPS if name != "region" or prof.needs_region(profile)]
+    following = order[order.index(step) + 1 :] if step in order else []
+    return following[0] if following else None
 
 
 def prev_step(step: str, profile: dict) -> str | None:
-    if step not in STEPS:
+    order = [name for name in STEPS if name != "region" or prof.needs_region(profile)]
+    if step not in order:
         return None
-    order = STEPS[: STEPS.index(step)]
-    return order[-1] if order else None
+    earlier = order[: order.index(step)]
+    return earlier[-1] if earlier else None
 
 
 # --------------------------------------------------------------------------
@@ -136,7 +165,7 @@ def _tail(step: str, profile: dict, mode: str) -> list[list[dict]]:
     «Далее» появляется только когда на шаге что-то выбрано: на пустом шаге
     оно означало бы ровно то же, что «Неважно».
 
-    На первом шаге назад некуда. В режиме правки из /settings назад ведёт
+    На первом шаге назад некуда. В режиме правки назад ведёт
     в список настроек: человек пришёл поменять один пункт, а не проходить
     мастер заново.
     """
@@ -147,7 +176,7 @@ def _tail(step: str, profile: dict, mode: str) -> list[list[dict]]:
         nav.append(_button("Сохранить" if mode == "edit" else "Продолжить", f"nx:{step}"))
 
     rows = []
-    label = SKIP_LABEL.get(step)
+    label = "Все роли" if step == "role" else SKIP_LABEL.get(step)
     if label:
         rows.append([_button(label, f"sk:{step}")])
     if nav:
@@ -196,13 +225,15 @@ def keyboard(step: str, profile: dict, mode: str) -> list[list[dict]]:
         chosen = profile.get("sources") or _all_sources()
         fits = taxonomy.coverage(prof.roles_of(profile))
         buttons = []
-        for key, body in taxonomy.sources().items():
-            if body.get("status") != "connected":
+        for group, body in SOURCE_GROUPS.items():
+            available = [key for key in body["sources"] if key in _all_sources()]
+            if not available:
                 continue
-            covers = fits.get(key) or []
-            mark = CHECK if key in chosen else ""
-            note = "" if covers else " (не даёт)"
-            buttons.append(_button(f"{mark}{body['label']}{note}", f"tsrc:{key}"))
+            selected = [key for key in available if key in chosen]
+            mark = CHECK if len(selected) == len(available) else ("◩ " if selected else "")
+            covers = any(fits.get(key) for key in available)
+            note = "" if covers else " (нет вакансий по этим ролям)"
+            buttons.append(_button(f"{mark}{body['label']}{note}", f"tsrcgrp:{group}"))
         return _rows(buttons) + _tail(step, profile, mode)
 
     if step == "grade":
@@ -236,20 +267,36 @@ def keyboard(step: str, profile: dict, mode: str) -> list[list[dict]]:
 
 
 def settings_keyboard() -> list[list[dict]]:
-    """Мастер отвечает на «кого ищем», фильтры — на «где и откуда».
-    Регион и источники в мастер не выносим: их тронут единицы, а каждый
-    лишний шаг теряет людей на входе."""
+    """Меню карточки фильтров: каждая кнопка ведёт к точечной правке."""
     return [
-        [_button("Направление", "ed:direction"), _button("Роль", "ed:role")],
-        [_button("Грейд", "ed:grade"), _button("Зарплата", "ed:salary")],
-        [_button("Формат работы", "ed:format")],
-        [_button("Регион", "ed:region"), _button("Источники", "ed:sources")],
-        [_button("Сбросить все фильтры", "go")],
+        [_button("Профессия", "ed:direction"), _button("Грейд", "ed:grade")],
+        [_button("Вилка", "ed:salary"), _button("Формат и регион", "ed:formatregion")],
+        [_button("Дополнительно", "ed:more")],
+        [_button("Сбросить", "reset:ask")],
     ]
 
 
+def format_region_keyboard() -> list[list[dict]]:
+    return [
+        [_button("Формат работы", "ed:format"), _button("Регион", "ed:region")],
+        [_button("Назад", "ed:menu")],
+    ]
+
+
+def menu_keyboard() -> dict:
+    return {
+        "keyboard": [[{"text": "Фильтры"}]],
+        "resize_keyboard": True,
+        "is_persistent": True,
+    }
+
+
+def welcome_keyboard() -> list[list[dict]]:
+    return [[_button("Настроить подборку", "onb:start")]]
+
+
 def done_keyboard() -> list[list[dict]]:
-    return [[_button("Поменять критерии", "ed:menu")]]
+    return [[_button("Открыть фильтры", "ed:menu")]]
 
 
 def input_keyboard(step: str) -> list[list[dict]]:
@@ -258,11 +305,37 @@ def input_keyboard(step: str) -> list[list[dict]]:
 
 
 def render(step: str, profile: dict, mode: str) -> tuple[str, list[list[dict]]]:
-    return QUESTIONS[step], keyboard(step, profile, mode)
+    body = QUESTIONS[step]
+    order = [name for name in STEPS if name != "region" or prof.needs_region(profile)]
+    if mode == "setup" and step in order:
+        body = re.sub(
+            r"Шаг \d+ из \d+",
+            f"Шаг {order.index(step) + 1} из {len(order)}",
+            body,
+            count=1,
+        )
+    else:
+        body = re.sub(r"Шаг \d+ из \d+[.·] ", "", body, count=1)
+    return body, keyboard(step, profile, mode)
 
 
 def render_settings(profile: dict) -> tuple[str, list[list[dict]]]:
-    return prof.summary(profile) + "\n\nЧто поменять?", settings_keyboard()
+    return prof.summary(profile) + "\n\nЧто изменить?", settings_keyboard()
+
+
+def render_more(profile: dict) -> tuple[str, list[list[dict]]]:
+    return QUESTIONS["sources"], keyboard("sources", profile, "edit")
+
+
+def render_format_region() -> tuple[str, list[list[dict]]]:
+    return "<b>Формат и регион</b>\n\nЧто изменить?", format_region_keyboard()
+
+
+def render_reset() -> tuple[str, list[list[dict]]]:
+    return (
+        "<b>Сбросить все фильтры?</b>\n\nПосле этого настроим подборку заново.",
+        [[_button("Сбросить", "reset:confirm"), _button("Назад", "reset:cancel")]],
+    )
 
 
 # --------------------------------------------------------------------------
@@ -303,27 +376,38 @@ def skip(step: str, profile: dict) -> None:
         profile[field] = None if field.startswith("salary") else []
 
 
-def apply(data: str, user: dict) -> None:
+def apply(data: str, user: dict) -> str | None:
     """Применяем нажатие к профилю. Переходы между шагами делает вызывающий."""
     profile = user["profile"]
 
     if data.startswith("td:"):
-        # Направление хранится не отдельно, а через роли: сняли направление —
-        # ушли и его роли, иначе выбор разъезжается сам с собой.
+        # Направления храним отдельно, чтобы выбор роли был самостоятельным шагом.
         direction = data[3:]
+        directions = prof.directions_of(profile)
         roles = profile.setdefault("roles", [])
-        mine = [r for r in roles if r.startswith(f"{direction}.")]
-        if mine:
-            for role in mine:
-                roles.remove(role)
+        if direction in directions:
+            directions.remove(direction)
+            profile["roles"] = [r for r in roles if not r.startswith(f"{direction}.")]
         else:
-            roles.extend(
-                f"{direction}.{role}" for role in taxonomy.roles()[direction]["roles"]
-            )
+            directions.append(direction)
+        profile["directions"] = directions
     elif data.startswith("trg:"):
         _toggle_from_all(profile, "regions", data[4:], [v for v, _ in prof.REGIONS])
     elif data.startswith("tsrc:"):
         _toggle_from_all(profile, "sources", data[5:], _all_sources())
+    elif data.startswith("tsrcgrp:"):
+        group = SOURCE_GROUPS.get(data[8:])
+        if group:
+            available = [key for key in group["sources"] if key in _all_sources()]
+            current = profile.get("sources") or _all_sources()
+            if all(key in current for key in available):
+                updated = [key for key in current if key not in available]
+                if not updated:
+                    return "Оставь включённой хотя бы одну группу источников."
+                profile["sources"] = updated
+            else:
+                updated = list(dict.fromkeys(current + available))
+                profile["sources"] = [] if set(updated) == set(_all_sources()) else updated
     elif data.startswith("tr:"):
         _toggle(profile.setdefault("roles", []), data[3:])
     elif data.startswith("tg:"):
@@ -338,3 +422,4 @@ def apply(data: str, user: dict) -> None:
         profile["salary_max"] = None
     elif data.startswith("sk:"):
         skip(data[3:], profile)
+    return None

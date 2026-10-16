@@ -57,6 +57,7 @@ def blank() -> dict:
     не подходит». Так человек, бросивший мастер на середине, всё равно
     получит дайджест."""
     return {
+        "directions": [],
         "roles": [],
         "grades": [],
         "salary_min": None,
@@ -103,6 +104,10 @@ def step_filled(profile: dict, step: str) -> bool:
         return bool(directions_of(profile))
     if step == "role":
         return bool(profile.get("roles"))
+    if step == "region":
+        return bool(profile.get("regions"))
+    if step == "sources":
+        return True
     return False
 
 
@@ -115,6 +120,8 @@ def migrate(profile: dict) -> dict:
     Конкретный город корзиной не заменить: у того, кто выбрал Петербург,
     подборка станет шире. Это цена отказа от ввода городов руками.
     """
+    if "directions" not in profile:
+        profile["directions"] = directions_of(profile)
     if profile.get("regions"):
         return profile
     if "places" not in profile and "cities" not in profile:
@@ -134,8 +141,9 @@ def migrate(profile: dict) -> dict:
 
 
 def directions_of(profile: dict) -> list[str]:
-    """Направления, которых человек коснулся: хранится всё в ролях,
-    отдельного поля нет — иначе они разъезжаются между собой."""
+    """Направления, выбранные в начале мастера; старые профили выводим из ролей."""
+    if "directions" in profile:
+        return list(profile.get("directions") or [])
     seen = []
     for role in profile.get("roles") or []:
         direction = role.partition(".")[0]
@@ -207,8 +215,23 @@ def describe_formats(profile: dict) -> str:
 def describe_roles(profile: dict) -> str:
     from finderjob import taxonomy
 
-    roles = profile.get("roles") or []
-    return ", ".join(taxonomy.label(r) for r in roles) if roles else "дизайн"
+    roles = roles_of(profile)
+    display = {
+        "design.product": "UX/UI-дизайнер",
+        "design.graphic": "Графический дизайнер",
+        "design.web": "Веб-дизайнер",
+        "design.motion": "Моушн-дизайнер",
+        "design.game": "Гейм-дизайнер",
+        "product.analyst": "Аналитик",
+    }
+    labels = []
+    for role in roles:
+        label = display.get(role, taxonomy.label(role))
+        if label.casefold().endswith(" (любой)"):
+            label = label[: -len(" (любой)")]
+        if label.casefold() not in {item.casefold() for item in labels}:
+            labels.append(label)
+    return ", ".join(labels) if labels else "дизайн"
 
 
 def describe_regions(profile: dict) -> str:
@@ -218,23 +241,57 @@ def describe_regions(profile: dict) -> str:
 
 
 def describe_sources(profile: dict) -> str:
-    from finderjob import taxonomy
+    from finderjob import wizard
 
-    keys = profile.get("sources") or []
-    if not keys:
+    keys = set(profile.get("sources") or [])
+    all_sources = {
+        source
+        for group in wizard.SOURCE_GROUPS.values()
+        for source in group["sources"]
+    }
+    if not keys or all_sources.issubset(keys):
         return "все"
-    return ", ".join(taxonomy.sources().get(k, {}).get("label", k) for k in keys)
+    selected = []
+    for key, label in wizard.SOURCE_GROUPS.items():
+        if keys.intersection(label["sources"]):
+            selected.append(label["label"])
+    return ", ".join(selected)
 
 
 def summary(profile: dict) -> str:
-    return (
-        "<b>Твои критерии</b>\n\n"
-        f"Профессии: {describe_roles(profile)}\n"
-        f"Грейд: {describe_grades(profile)}\n"
-        f"Зарплата: {describe_salary(profile)}\n"
-        f"Формат работы: {describe_formats(profile)}\n"
-        f"Регион: {describe_regions(profile)}\n"
-        f"Источники: {describe_sources(profile)}"
+    from html import escape
+    from finderjob import wizard
+
+    roles = escape(describe_roles(profile))
+    grades = escape(describe_grades(profile).lower())
+    raw_salary = describe_salary(profile).lower()
+    salary = escape(raw_salary + (" ₽" if "от " in raw_salary or "до " in raw_salary else ""))
+    formats = profile.get("formats") or [value for value, _ in FORMATS]
+    format_labels = {"remote": "удалёнка", "hybrid": "гибрид", "office": "офис"}
+    work = ", ".join(format_labels[value] for value in formats if value in format_labels)
+    if needs_region(profile) and profile.get("regions"):
+        region_labels = {value: label.lower() for value, label in REGIONS}
+        region = ", ".join(region_labels[value] for value in profile["regions"] if value in region_labels)
+        if region:
+            work += f" · {escape(region)}"
+
+    body = (
+        f"• <b>{roles}</b>\n"
+        f'<tg-emoji emoji-id="{wizard.CUSTOM_EMOJI_IDS["⚡️"]}">⚡️</tg-emoji> '
+        f"Грейд: {grades}\n"
+        f'<tg-emoji emoji-id="{wizard.CUSTOM_EMOJI_IDS["💎"]}">💎</tg-emoji> '
+        f"Вилка: {salary}\n"
+        f'<tg-emoji emoji-id="{wizard.CUSTOM_EMOJI_IDS["💼"]}">💼</tg-emoji> '
+        f"Формат: {escape(work)}"
     )
+    sources = set(profile.get("sources") or [])
+    available_sources = {
+        source
+        for group in wizard.SOURCE_GROUPS.values()
+        for source in group["sources"]
+    }
+    if sources and not available_sources.issubset(sources):
+        body += f"\nИсточники: {escape(describe_sources(profile))}"
+    return body
 
 

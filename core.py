@@ -129,7 +129,7 @@ CYRILLIC_RE = re.compile(r"[а-яё]", re.I)
 # при пустом списке источников считается подходящей, но портал Skillbox
 # рассматривает отклик лишь с резюме по их шаблону: человеку со стороны такая
 # вакансия — обещание, которое бот выполнить не может.
-OPT_IN_SOURCES = {"friendwork", "linkedin"}
+OPT_IN_SOURCES = {"friendwork"}
 
 
 def _place_allowed(vacancy: Vacancy, rules: dict) -> bool:

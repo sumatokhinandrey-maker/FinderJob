@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 
@@ -11,6 +12,10 @@ API = "https://api.telegram.org/bot{token}/{method}"
 
 # Telegram режет сообщения длиннее 4096 символов.
 LIMIT = 4000
+
+
+def _plain_custom_emoji(text: str) -> str:
+    return re.sub(r'<tg-emoji emoji-id="[^"]+">(.*?)</tg-emoji>', r"\1", text)
 
 
 def token() -> str:
@@ -53,7 +58,7 @@ def chunks(text: str) -> list[str]:
     return parts
 
 
-def send(chat_id: int | str, text: str, keyboard: list | None = None) -> int | None:
+def send(chat_id: int | str, text: str, keyboard: list | dict | None = None) -> int | None:
     """Длинное сообщение уходит частями, кнопки вешаем на последнюю —
     иначе они уедут в середину простыни. Возвращаем id последней части:
     её потом правит мастер настройки."""
@@ -67,8 +72,16 @@ def send(chat_id: int | str, text: str, keyboard: list | None = None) -> int | N
             "disable_web_page_preview": True,
         }
         if keyboard is not None and index == len(parts) - 1:
-            params["reply_markup"] = {"inline_keyboard": keyboard}
-        message_id = call("sendMessage", **params).get("message_id")
+            params["reply_markup"] = (
+                keyboard if isinstance(keyboard, dict) else {"inline_keyboard": keyboard}
+            )
+        try:
+            message_id = call("sendMessage", **params).get("message_id")
+        except RuntimeError:
+            if "<tg-emoji " not in part:
+                raise
+            params["text"] = _plain_custom_emoji(part)
+            message_id = call("sendMessage", **params).get("message_id")
     return message_id
 
 
@@ -87,6 +100,10 @@ def edit(chat_id: int | str, message_id: int, text: str, keyboard: list | None) 
     try:
         call("editMessageText", **params)
     except RuntimeError as exc:
+        if "not modified" not in str(exc) and "<tg-emoji " in text:
+            params["text"] = _plain_custom_emoji(text)
+            call("editMessageText", **params)
+            return
         # «message is not modified» — человек нажал ту же кнопку дважды.
         # Это не ошибка, молчим.
         if "not modified" not in str(exc):

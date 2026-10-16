@@ -27,12 +27,19 @@ STOPPED = (
 )
 
 
-def first_digest(user: dict) -> None:
+def first_digest(user: dict, install_menu: bool = False) -> None:
     """Подборка сразу после мастера — из запаса, собранного последней рассылкой.
     Показанное отмечаем, чтобы утром эти же вакансии не пришли повторно."""
     rows, collected_at = store.load_pool()
     if not rows:
-        tg.send(user["chat_id"], wizard.EMPTY_POOL)
+        tg.send(
+            user["chat_id"],
+            wizard.EMPTY_POOL,
+            wizard.menu_keyboard() if install_menu else None,
+        )
+        if install_menu:
+            user["menu_installed"] = True
+            store.save_user(user)
         return
 
     vacancies = core.fill_grades(core.from_rows(rows))
@@ -43,6 +50,9 @@ def first_digest(user: dict) -> None:
     pages = core.build_pages(fresh, rejected.get("grade_unknown", 0))
     store.save_digest(user["chat_id"], pages)
     tg.send(user["chat_id"], pages[0], core.digest_keyboard(0, len(pages)))
+    if install_menu:
+        tg.send(user["chat_id"], "Кнопка «Фильтры» закреплена внизу чата.", wizard.menu_keyboard())
+        user["menu_installed"] = True
     stats.track("digest_sent")
     stats.track("vacancies_sent", len(fresh))
 
@@ -94,6 +104,31 @@ def _user(chat: dict) -> dict:
     )
 
 
+def _configured(user: dict) -> bool:
+    return bool(user.get("setup_complete") or (user.get("profile") or {}).get("grades"))
+
+
+def _set_user_commands(chat_id: int, configured: bool) -> None:
+    commands = wizard.CONFIGURED_COMMANDS if configured else wizard.COMMANDS
+    tg.call(
+        "setMyCommands",
+        commands=[{"command": name, "description": description} for name, description in commands],
+        scope={"type": "chat", "chat_id": chat_id},
+    )
+
+
+def _show_filters(user: dict, chat_id: int, install_menu: bool = False) -> None:
+    user["awaiting"] = None
+    user["mode"] = "edit"
+    user["step"] = None
+    body, keyboard = wizard.render_settings(user["profile"])
+    if install_menu:
+        tg.send(chat_id, "Кнопка «Фильтры» закреплена внизу чата.", wizard.menu_keyboard())
+    tg.send(chat_id, body, keyboard)
+    user["menu_installed"] = True
+    store.save_user(user)
+
+
 def handle_message(message: dict) -> None:
     chat = message.get("chat") or {}
     text = (message.get("text") or "").strip()
@@ -108,19 +143,22 @@ def handle_message(message: dict) -> None:
 
     if text.startswith("/stop"):
         store.forget_user(chat["id"])
+        _set_user_commands(chat["id"], False)
         stats.track("stop")
-        tg.send(chat["id"], STOPPED)
+        tg.send(chat["id"], STOPPED, {"remove_keyboard": True})
         return
 
     user = _user(chat)
 
     if text.startswith("/start"):
-        # «Перезапустить бота» — значит с чистого листа: иначе человек видит
-        # галочки с прошлого прохода и принимает их за выбор по умолчанию.
-        # Память о показанных вакансиях при этом не трогаем.
-        user["profile"] = prof.blank()
         stats.track("start")
-        _open_step(user, "grade", "setup")
+        if _configured(user):
+            _set_user_commands(chat["id"], True)
+            _show_filters(user, chat["id"], not user.get("menu_installed"))
+        elif user.get("step"):
+            _open_step(user, user["step"], "setup")
+        else:
+            tg.send(chat["id"], wizard.WELCOME, wizard.welcome_keyboard())
         return
 
     if user.get("awaiting") and not text.startswith("/"):
@@ -131,15 +169,13 @@ def handle_message(message: dict) -> None:
         tg.send(chat["id"], stats.report())
         return
 
-    if text.startswith("/setting"):
+    if text in ("Фильтры", "/filters", "/settings"):
+        if not _configured(user):
+            tg.send(chat["id"], wizard.WELCOME, wizard.welcome_keyboard())
+            return
         stats.track("settings")
-        user["awaiting"] = None
-        user["mode"] = "edit"
-        user["step"] = None
-        store.save_user(user)
-        body, keyboard = wizard.render_settings(user["profile"])
-        user["card"] = tg.send(chat["id"], body, keyboard)
-        store.save_user(user)
+        _set_user_commands(chat["id"], True)
+        _show_filters(user, chat["id"], not user.get("menu_installed"))
         return
 
     tg.send(chat["id"], wizard.HELP)
@@ -182,23 +218,58 @@ def handle_callback(callback: dict) -> None:
     message_id = message.get("message_id")
     finished = False
     edited = False
+    notice = ""
 
-    if data == "go":
-        # «Задать заново» из настроек — тоже с чистого листа.
+    if data == "onb:start":
         user["profile"] = profile = prof.blank()
         user["mode"] = "setup"
-        user["step"] = "grade"
-        body, keyboard = wizard.render("grade", profile, "setup")
+        user["setup_complete"] = False
+        user["step"] = "direction"
+        body, keyboard = wizard.render("direction", profile, "setup")
 
     elif data == "ed:menu":
         user["mode"] = "edit"
         user["step"] = None
         body, keyboard = wizard.render_settings(profile)
 
+    elif data == "ed:more":
+        user["mode"] = "edit"
+        user["step"] = "sources"
+        body, keyboard = wizard.render_more(profile)
+
+    elif data == "ed:formatregion":
+        user["mode"] = "edit"
+        user["step"] = None
+        body, keyboard = wizard.render_format_region()
+
+    elif data in ("reset:ask", "go"):
+        body, keyboard = wizard.render_reset()
+
+    elif data == "reset:cancel":
+        user["mode"] = "edit"
+        user["step"] = None
+        body, keyboard = wizard.render_settings(profile)
+
+    elif data == "reset:confirm":
+        user["profile"] = profile = prof.blank()
+        user["setup_complete"] = False
+        user["mode"] = "setup"
+        user["step"] = "direction"
+        user["menu_installed"] = False
+        _set_user_commands(chat["id"], False)
+        tg.send(chat["id"], "Настройка сброшена.", {"remove_keyboard": True})
+        body, keyboard = wizard.render("direction", profile, "setup")
+
     elif data.startswith("ed:"):
         user["mode"] = "edit"
         user["step"] = data[3:]
-        body, keyboard = wizard.render(user["step"], profile, "edit")
+        if user["step"] == "more":
+            user["step"] = "sources"
+            body, keyboard = wizard.render_more(profile)
+        elif user["step"] == "sources":
+            body, keyboard = wizard.render("sources", profile, "edit")
+        else:
+            body, keyboard = wizard.render(user["step"], profile, "edit")
 
     elif data.startswith("ca:"):
         user["awaiting"] = None
@@ -211,7 +282,7 @@ def handle_callback(callback: dict) -> None:
             user["step"] = None
             body, keyboard = wizard.render_settings(profile)
         else:
-            earlier = wizard.prev_step(data[3:], profile) or "grade"
+            earlier = wizard.prev_step(data[3:], profile) or "direction"
             user["step"] = earlier
             body, keyboard = wizard.render(earlier, profile, "setup")
 
@@ -220,9 +291,13 @@ def handle_callback(callback: dict) -> None:
         step = data[3:]
         user["awaiting"] = None
         if user.get("mode") == "edit":
-            user["step"] = None
-            edited = True
-            body, keyboard = wizard.render_settings(profile)
+            if step == "direction":
+                user["step"] = "role"
+                body, keyboard = wizard.render("role", profile, "edit")
+            else:
+                user["step"] = None
+                edited = True
+                body, keyboard = wizard.render_settings(profile)
         else:
             following = wizard.next_step(step, profile)
             user["step"] = following
@@ -232,11 +307,13 @@ def handle_callback(callback: dict) -> None:
                 body = prof.summary(profile) + "\n\n" + wizard.DONE
                 keyboard = wizard.done_keyboard()
                 finished = True
+                user["setup_complete"] = True
+                _set_user_commands(chat["id"], True)
                 stats.track("wizard_done")
 
     else:
-        wizard.apply(data, user)
-        step = user.get("step") or "grade"
+        notice = wizard.apply(data, user)
+        step = user.get("step") or "direction"
         body, keyboard = wizard.render(step, profile, user.get("mode", "setup"))
 
     if message_id:
@@ -246,10 +323,10 @@ def handle_callback(callback: dict) -> None:
         tg.edit(chat["id"], message_id, body, keyboard)
     else:
         tg.send(chat["id"], body, keyboard)
-    tg.answer_callback(callback["id"])
+    tg.answer_callback(callback["id"], notice)
 
     if finished:
-        first_digest(user)
+        first_digest(user, install_menu=True)
     elif edited:
         # Правка критерия молча — это правка вслепую: человек не знает,
         # что она дала. Показываем подборку по новым критериям сразу,
