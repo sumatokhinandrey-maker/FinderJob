@@ -91,10 +91,11 @@ def deliver(user: dict, vacancies: list, dry_run: bool, cap: int = 0) -> int:
 
     store.save_digest(user["chat_id"], pages)
     tg.send(user["chat_id"], digest, core.digest_keyboard(0, len(pages)))
-    if not user.get("menu_installed"):
+    if user.get("menu_version") != wizard.MENU_VERSION:
         try:
             tg.send(user["chat_id"], wizard.MENU_PROMPT, wizard.menu_keyboard())
             user["menu_installed"] = True
+            user["menu_version"] = wizard.MENU_VERSION
         except RuntimeError as exc:
             print(f"    ! не удалось установить клавиатуру фильтров: {exc}")
     stats.track("digest_sent")
