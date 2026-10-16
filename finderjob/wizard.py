@@ -29,12 +29,6 @@ SKIP_LABEL = {
 
 CHECK = "✓ "  # галочка перед выбранным пунктом
 
-CUSTOM_EMOJI_IDS = {
-    "⚡️": "5843553939672274145",
-    "💎": "5807465992363710697",
-    "💼": "5967389567781703494",
-}
-
 SOURCE_GROUPS = {
     "companies": {"label": "Сайты компаний", "sources": ["companies", "ats"]},
     "aggregators": {
@@ -64,11 +58,7 @@ CONFIGURED_COMMANDS = [
     ("stop", "отписаться от дайджеста"),
 ]
 
-DONE = (
-    "Критерии сохранены. Дальше дайджест будет приходить сам, "
-    "каждый день в 9 утра по Москве.\n\n"
-    "Изменить их можно кнопкой «Фильтры» внизу."
-)
+REVIEW_PROMPT = "Проверь критерии. Если всё верно, нажми «Найти вакансии»."
 
 EMPTY_POOL = (
     "Критерии сохранены.\n\n"
@@ -76,15 +66,7 @@ EMPTY_POOL = (
     "завтра в 9 утра по Москве."
 )
 
-HELP = (
-    "<b>FinderJob</b> присылает ежедневный дайджест вакансий для дизайнеров.\n\n"
-    "/start — настроить подборку\n"
-    "/filters — посмотреть и изменить фильтры\n"
-    "/stop — отписаться от дайджеста\n\n"
-    "Вакансии беру с hirehi, hh.ru, Хабр Карьеры, getmatch, careerspace, "
-    "designer.ru и карьерных сайтов компаний. Профессию выбираешь сам — "
-    "дизайн, контент, разработка или продукт."
-)
+HELP = "Открой фильтры кнопкой внизу или командой /filters."
 
 # Пороги зарплаты. Нижняя граница, а не вилка: верхняя отсекала бы и тех,
 # кто платит больше потолка, — на этом уже обжигались.
@@ -270,7 +252,8 @@ def settings_keyboard() -> list[list[dict]]:
     """Меню карточки фильтров: каждая кнопка ведёт к точечной правке."""
     return [
         [_button("Профессия", "ed:direction"), _button("Грейд", "ed:grade")],
-        [_button("Вилка", "ed:salary"), _button("Формат и регион", "ed:formatregion")],
+        [_button("Вилка", "ed:salary"), _button("Формат", "ed:format")],
+        [_button("Регион", "ed:region")],
         [_button("Дополнительно", "ed:more")],
         [_button("Сбросить", "reset:ask")],
     ]
@@ -278,7 +261,7 @@ def settings_keyboard() -> list[list[dict]]:
 
 def format_region_keyboard() -> list[list[dict]]:
     return [
-        [_button("Формат работы", "ed:format"), _button("Регион", "ed:region")],
+        [_button("Формат", "ed:format"), _button("Регион", "ed:region")],
         [_button("Назад", "ed:menu")],
     ]
 
@@ -296,7 +279,10 @@ def welcome_keyboard() -> list[list[dict]]:
 
 
 def done_keyboard() -> list[list[dict]]:
-    return [[_button("Открыть фильтры", "ed:menu")]]
+    return [
+        [_button("Найти вакансии", "search:find")],
+        [_button("Изменить фильтры", "search:edit")],
+    ]
 
 
 def input_keyboard(step: str) -> list[list[dict]]:

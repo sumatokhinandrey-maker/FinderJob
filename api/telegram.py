@@ -51,7 +51,7 @@ def first_digest(user: dict, install_menu: bool = False) -> None:
     store.save_digest(user["chat_id"], pages)
     tg.send(user["chat_id"], pages[0], core.digest_keyboard(0, len(pages)))
     if install_menu:
-        tg.send(user["chat_id"], "Кнопка «Фильтры» закреплена внизу чата.", wizard.menu_keyboard())
+        tg.send(user["chat_id"], "Меню", wizard.menu_keyboard())
         user["menu_installed"] = True
     stats.track("digest_sent")
     stats.track("vacancies_sent", len(fresh))
@@ -123,7 +123,7 @@ def _show_filters(user: dict, chat_id: int, install_menu: bool = False) -> None:
     user["step"] = None
     body, keyboard = wizard.render_settings(user["profile"])
     if install_menu:
-        tg.send(chat_id, "Кнопка «Фильтры» закреплена внизу чата.", wizard.menu_keyboard())
+        tg.send(chat_id, "Меню", wizard.menu_keyboard())
     tg.send(chat_id, body, keyboard)
     user["menu_installed"] = True
     store.save_user(user)
@@ -135,10 +135,9 @@ def handle_message(message: dict) -> None:
     if not chat.get("id"):
         return
 
-    # Команда своё дело сделала, в переписке от неё остаётся только мусор:
-    # ответ бота всё равно говорит, что произошло. Убираем сразу, до разбора,
-    # иначе на /stop и /start до удаления дело не дойдёт.
-    if text.startswith("/") and message.get("message_id"):
+    # Команда или кнопка меню своё дело сделали, в переписке оставлять их
+    # не нужно: ответ бота показывает результат. Убираем до разбора.
+    if (text.startswith("/") or text == "Фильтры") and message.get("message_id"):
         tg.delete(chat["id"], message["message_id"])
 
     if text.startswith("/stop"):
@@ -227,6 +226,21 @@ def handle_callback(callback: dict) -> None:
         user["step"] = "direction"
         body, keyboard = wizard.render("direction", profile, "setup")
 
+    elif data == "search:find":
+        user["setup_complete"] = True
+        user["pending_first_search"] = False
+        user["mode"] = "edit"
+        user["step"] = None
+        _set_user_commands(chat["id"], True)
+        body, keyboard = "Ищу вакансии…", []
+        finished = True
+        stats.track("wizard_done")
+
+    elif data == "search:edit":
+        user["mode"] = "edit"
+        user["step"] = None
+        body, keyboard = wizard.render_settings(profile)
+
     elif data == "ed:menu":
         user["mode"] = "edit"
         user["step"] = None
@@ -253,6 +267,7 @@ def handle_callback(callback: dict) -> None:
     elif data == "reset:confirm":
         user["profile"] = profile = prof.blank()
         user["setup_complete"] = False
+        user["pending_first_search"] = False
         user["mode"] = "setup"
         user["step"] = "direction"
         user["menu_installed"] = False
@@ -294,6 +309,11 @@ def handle_callback(callback: dict) -> None:
             if step == "direction":
                 user["step"] = "role"
                 body, keyboard = wizard.render("role", profile, "edit")
+            elif user.get("pending_first_search"):
+                user["mode"] = "review"
+                user["step"] = None
+                body = prof.summary(profile) + "\n\n" + wizard.REVIEW_PROMPT
+                keyboard = wizard.done_keyboard()
             else:
                 user["step"] = None
                 edited = True
@@ -304,12 +324,10 @@ def handle_callback(callback: dict) -> None:
             if following:
                 body, keyboard = wizard.render(following, profile, "setup")
             else:
-                body = prof.summary(profile) + "\n\n" + wizard.DONE
+                body = prof.summary(profile) + "\n\n" + wizard.REVIEW_PROMPT
                 keyboard = wizard.done_keyboard()
-                finished = True
-                user["setup_complete"] = True
-                _set_user_commands(chat["id"], True)
-                stats.track("wizard_done")
+                user["pending_first_search"] = True
+                user["mode"] = "review"
 
     else:
         notice = wizard.apply(data, user)

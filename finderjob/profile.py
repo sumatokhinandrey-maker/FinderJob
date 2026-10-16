@@ -269,20 +269,23 @@ def summary(profile: dict) -> str:
     formats = profile.get("formats") or [value for value, _ in FORMATS]
     format_labels = {"remote": "удалёнка", "hybrid": "гибрид", "office": "офис"}
     work = ", ".join(format_labels[value] for value in formats if value in format_labels)
-    if needs_region(profile) and profile.get("regions"):
-        region_labels = {value: label.lower() for value, label in REGIONS}
-        region = ", ".join(region_labels[value] for value in profile["regions"] if value in region_labels)
-        if region:
-            work += f" · {escape(region)}"
+    if not needs_region(profile):
+        region = "не нужен для удалённой работы"
+    else:
+        region_labels = {"ru": "РФ", "cis": "СНГ", "abroad": "зарубежье"}
+        region = ", ".join(
+            region_labels[value]
+            for value in profile.get("regions") or []
+            if value in region_labels
+        ) or "любой"
 
     body = (
+        "<b>Фильтры</b>\n\n"
         f"• <b>{roles}</b>\n"
-        f'<tg-emoji emoji-id="{wizard.CUSTOM_EMOJI_IDS["⚡️"]}">⚡️</tg-emoji> '
-        f"Грейд: {grades}\n"
-        f'<tg-emoji emoji-id="{wizard.CUSTOM_EMOJI_IDS["💎"]}">💎</tg-emoji> '
-        f"Вилка: {salary}\n"
-        f'<tg-emoji emoji-id="{wizard.CUSTOM_EMOJI_IDS["💼"]}">💼</tg-emoji> '
-        f"Формат: {escape(work)}"
+        f"⚡️ Грейд: {grades}\n"
+        f"💰 Вилка: {salary}\n"
+        f"💼 Формат: {escape(work)}\n"
+        f"📍 Регион: {escape(region)}"
     )
     sources = set(profile.get("sources") or [])
     available_sources = {

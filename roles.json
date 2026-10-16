@@ -5,7 +5,7 @@
       "label": "Дизайн",
       "roles": {
         "product": {
-          "label": "Продуктовый",
+          "label": "UX/UI",
           "include": [
             "ux",
             "ui",
