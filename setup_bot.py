@@ -53,7 +53,7 @@ def main() -> int:
 
         if not user.get("menu_installed"):
             try:
-                tg.send(chat_id, "Меню", wizard.menu_keyboard())
+                tg.send(chat_id, wizard.MENU_PROMPT, wizard.menu_keyboard())
                 user["menu_installed"] = True
                 store.save_user(user)
                 installed += 1

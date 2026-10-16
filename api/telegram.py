@@ -51,7 +51,7 @@ def first_digest(user: dict, install_menu: bool = False) -> None:
     store.save_digest(user["chat_id"], pages)
     tg.send(user["chat_id"], pages[0], core.digest_keyboard(0, len(pages)))
     if install_menu and not user.get("menu_installed"):
-        tg.send(user["chat_id"], "Меню", wizard.menu_keyboard())
+        tg.send(user["chat_id"], wizard.MENU_PROMPT, wizard.menu_keyboard())
         user["menu_installed"] = True
     stats.track("digest_sent")
     stats.track("vacancies_sent", len(fresh))
@@ -111,7 +111,7 @@ def _configured(user: dict) -> bool:
 def _ensure_menu_keyboard(user: dict, chat_id: int) -> None:
     if user.get("menu_installed"):
         return
-    tg.send(chat_id, "Меню", wizard.menu_keyboard())
+    tg.send(chat_id, wizard.MENU_PROMPT, wizard.menu_keyboard())
     user["menu_installed"] = True
 
 
