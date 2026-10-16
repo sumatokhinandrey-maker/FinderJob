@@ -105,7 +105,10 @@ def step_filled(profile: dict, step: str) -> bool:
     if step == "role":
         return bool(profile.get("roles"))
     if step == "region":
-        return bool(profile.get("regions"))
+        # Пустой список регионов означает «любой», а клавиатура показывает
+        # все регионы отмеченными. Значит, продолжить можно сразу, не снимая
+        # ни одной отметки.
+        return True
     if step == "sources":
         return True
     return False
