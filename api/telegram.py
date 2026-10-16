@@ -40,7 +40,6 @@ def first_digest(user: dict, install_menu: bool = False) -> None:
         )
         if install_menu:
             user["menu_installed"] = True
-            user["menu_version"] = wizard.MENU_VERSION
             store.save_user(user)
         return
 
@@ -55,7 +54,6 @@ def first_digest(user: dict, install_menu: bool = False) -> None:
     if install_menu and not user.get("menu_installed"):
         tg.send(user["chat_id"], wizard.MENU_PROMPT, wizard.menu_keyboard())
         user["menu_installed"] = True
-        user["menu_version"] = wizard.MENU_VERSION
     stats.track("digest_sent")
     stats.track("vacancies_sent", len(fresh))
 
@@ -127,7 +125,6 @@ def _ensure_menu_keyboard(user: dict, chat_id: int, force: bool = False) -> None
         return
     tg.send(chat_id, wizard.MENU_PROMPT, wizard.menu_keyboard())
     user["menu_installed"] = True
-    user["menu_version"] = wizard.MENU_VERSION
 
 
 def _show_filters(user: dict, chat_id: int, install_menu: bool = False) -> None:
@@ -172,13 +169,10 @@ def handle_message(message: dict) -> None:
         else:
             tg.send(chat["id"], wizard.WELCOME, wizard.menu_keyboard())
             user["menu_installed"] = True
-            user["menu_version"] = wizard.MENU_VERSION
             store.save_user(user)
         return
 
     if text in ("Фильтры", "/filters", "/settings"):
-        if text == "Фильтры":
-            user["menu_version"] = wizard.MENU_VERSION
         if not _configured(user):
             _ensure_menu_keyboard(user, chat["id"], force=text.startswith("/"))
             _open_step(user, user.get("step") or "direction", "setup")
