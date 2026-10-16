@@ -284,7 +284,7 @@ def summary(profile: dict) -> str:
 
     body = (
         "<b>Фильтры</b>\n\n"
-        f"• <strong>{roles}</strong>\n"
+        f"• {roles}\n"
         f"⚡️ Грейд: {grades}\n"
         f"💰 Вилка: {salary}\n"
         f"💼 Формат: {escape(work)}\n"

@@ -68,9 +68,7 @@ def deliver(user: dict, vacancies: list, dry_run: bool, cap: int = 0) -> int:
         fresh.sort(key=lambda v: v.posted_at, reverse=True)
         fresh, tail = fresh[:cap], len(fresh) - cap
 
-    pages = core.build_pages(
-        fresh, rejected.get("grade_unknown", 0), prof.roles_of(user["profile"])
-    )
+    pages = core.build_pages(fresh, prof.roles_of(user["profile"]))
     if tail:
         # Приписку вешаем на последнюю страницу: она про то, что будет
         # дальше, и читается в конце подборки, а не поверх неё.

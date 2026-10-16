@@ -43,11 +43,11 @@ def first_digest(user: dict, install_menu: bool = False) -> None:
         return
 
     vacancies = core.fill_grades(core.from_rows(rows))
-    passed, rejected = core.apply_filters(vacancies, prof.to_filters(user["profile"]))
+    passed, _ = core.apply_filters(vacancies, prof.to_filters(user["profile"]))
     seen = user.get("seen") or {}
     fresh = core.only_new(passed, seen)
 
-    pages = core.build_pages(fresh, rejected.get("grade_unknown", 0))
+    pages = core.build_pages(fresh)
     store.save_digest(user["chat_id"], pages)
     tg.send(user["chat_id"], pages[0], core.digest_keyboard(0, len(pages)))
     if install_menu and not user.get("menu_installed"):

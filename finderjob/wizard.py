@@ -20,9 +20,9 @@ STEPS = ["direction", "role", "grade", "salary", "format", "region"]
 # Слово согласуется с существительным шага: «Зарплата — любая», но
 # «Формат работы — любой». У grade и direction кнопки нет вовсе.
 SKIP_LABEL = {
-    "role": "Все роли",
+    "role": "Выбрать всё",
     "salary": "Любая",
-    "format": "Любой",
+    "format": "Выбрать всё",
     "region": "Любой",
     "sources": "Все",
 }
@@ -72,7 +72,10 @@ QUESTIONS = {
         "Выбери минимальную зарплату. Вакансии без указанной вилки останутся."
     ),
     "format": "<b>Шаг 5 из 6. Формат</b>\n\nГде готов работать? Можно выбрать несколько.",
-    "region": "<b>Шаг 6 из 6. Регион</b>\n\nГде готов ездить в офис или работать гибридно?",
+    "region": (
+        "<b>Шаг 6 из 6. Регион</b>\n\n"
+        "В каких регионах искать вакансии с офисом или гибридом?"
+    ),
     "sources": (
         "<b>Источники</b>\n\nИсточники вакансий. "
         "По умолчанию включены все подключённые источники."
@@ -149,7 +152,7 @@ def _tail(step: str, profile: dict, mode: str) -> list[list[dict]]:
         nav.append(_button("Сохранить" if mode == "edit" else "Продолжить", f"nx:{step}"))
 
     rows = []
-    label = "Все роли" if step == "role" else SKIP_LABEL.get(step)
+    label = SKIP_LABEL.get(step)
     if label:
         rows.append([_button(label, f"sk:{step}")])
     if nav:

@@ -444,8 +444,7 @@ def _grouped(vacancies: list[Vacancy], roles: list[str]) -> str:
 PER_PAGE = 10
 
 
-def build_pages(vacancies: list[Vacancy], held_back: int = 0,
-                roles: list[str] | None = None,
+def build_pages(vacancies: list[Vacancy], roles: list[str] | None = None,
                 per_page: int = PER_PAGE) -> list[str]:
     """Дайджест страницами по per_page вакансий.
 
@@ -457,16 +456,15 @@ def build_pages(vacancies: list[Vacancy], held_back: int = 0,
     на второй странице думает, что вакансий всего десять.
     """
     if not vacancies:
-        return [build_digest(vacancies, held_back, roles)]
+        return [build_digest(vacancies, roles)]
 
     chunks = [
         vacancies[start:start + per_page]
         for start in range(0, len(vacancies), per_page)
     ]
     total = len(vacancies)
-    # Приписку про скрытые показываем один раз, на первой странице.
     pages = [
-        build_digest(chunk, held_back if index == 0 else 0, roles, total=total)
+        build_digest(chunk, roles, total=total)
         for index, chunk in enumerate(chunks)
     ]
     if len(pages) > 1:
@@ -491,28 +489,15 @@ def digest_keyboard(index: int, pages: int) -> list[list[dict]] | None:
     return [row]
 
 
-def build_digest(vacancies: list[Vacancy], held_back: int = 0,
-                 roles: list[str] | None = None, total: int | None = None) -> str:
-    """held_back — сколько вакансий скрыто из-за неназванного грейда.
-    Молчать об этом нельзя: у тех, кто ищет стажировку, подборка выходит
-    короткой, и без объяснения это неотличимо от поломки бота.
-
-    roles — профессии человека: если их больше одной, подборка разбивается
+def build_digest(vacancies: list[Vacancy], roles: list[str] | None = None,
+                 total: int | None = None) -> str:
+    """roles — профессии человека: если их больше одной, подборка разбивается
     на группы по профессиям."""
     today = date.today()
     header = f"<b>Дайджест {today.day} {MONTHS[today.month - 1]}</b>"
 
-    note = ""
-    if held_back:
-        note = (
-            f"\n\nСкрыто ещё {held_back} "
-            + _plural_hidden(held_back)
-            + ": в них уровень не назван, а такие вакансии почти всегда "
-            "на мидла. Чтобы видеть и их, добавь в /settings нужный грейд."
-        )
-
     if not vacancies:
-        return header + "\nСегодня ничего нового по твоим фильтрам." + note
+        return header + "\nСегодня ничего нового по твоим фильтрам."
 
     counted = total if total is not None else len(vacancies)
     header += f" · {counted} " + _plural(counted)
@@ -523,15 +508,7 @@ def build_digest(vacancies: list[Vacancy], held_back: int = 0,
         body = _grouped(vacancies, roles)
     if not body:
         body = "\n\n".join(_line(v) for v in vacancies)
-    return header + "\n\n" + body + note
-
-
-def _plural_hidden(n: int) -> str:
-    if n % 10 == 1 and n % 100 != 11:
-        return "вакансия"
-    if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
-        return "вакансии"
-    return "вакансий"
+    return header + "\n\n" + body
 
 
 def _plural(n: int) -> str:
