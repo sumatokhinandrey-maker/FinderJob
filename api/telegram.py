@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import core  # noqa: E402
 from finderjob import profile as prof  # noqa: E402
-from finderjob import stats, store, tg, wizard  # noqa: E402
+from finderjob import daily, stats, store, tg, wizard  # noqa: E402
 
 STOPPED = (
     "Отписал. Дайджест больше не придёт, критерии стёр.\n\n"
@@ -51,6 +51,8 @@ def first_digest(user: dict, install_menu: bool = False) -> None:
     pages = core.build_pages(fresh)
     store.save_digest(user["chat_id"], pages)
     tg.send(user["chat_id"], pages[0], core.digest_keyboard(0, len(pages)))
+    if collected_at == daily.moscow_day():
+        store.mark_delivery_sent(user["chat_id"], collected_at)
     if install_menu and not user.get("menu_installed"):
         tg.send(user["chat_id"], wizard.MENU_PROMPT, wizard.menu_keyboard())
         user["menu_installed"] = True

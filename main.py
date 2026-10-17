@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT))
 
 import core  # noqa: E402
 from finderjob import profile as prof  # noqa: E402
-from finderjob import stats, store, taxonomy, tg  # noqa: E402
+from finderjob import daily, stats, store, taxonomy  # noqa: E402
 from sources import (ats, careerspace, companies, designer, finder,  # noqa: E402
                      friendwork, getmatch, habr, hh, hirehi, linkedin,
                      telegram)
@@ -50,58 +50,6 @@ def load_env() -> None:
         os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
 
 
-def deliver(user: dict, vacancies: list, dry_run: bool, cap: int = 0) -> int:
-    """Готовим и отправляем дайджест одному человеку. Возвращаем,
-    сколько вакансий ему ушло."""
-    prof.migrate(user["profile"])
-    filters = prof.to_filters(user["profile"])
-    passed, rejected = core.apply_filters(vacancies, filters)
-
-    seen = user.get("seen") or {}
-    fresh = core.only_new(passed, seen)
-
-    # Окно в месяц на первом прогоне даёт человеку сотни вакансий разом —
-    # это не подборка, а простыня на полтора десятка сообщений. Отдаём самое
-    # свежее, остальное не помечаем показанным: оно придёт следующими днями.
-    tail = 0
-    if cap and len(fresh) > cap:
-        fresh.sort(key=lambda v: v.posted_at, reverse=True)
-        fresh, tail = fresh[:cap], len(fresh) - cap
-
-    pages = core.build_pages(fresh, prof.roles_of(user["profile"]))
-    if tail:
-        # Приписку вешаем на последнюю страницу: она про то, что будет
-        # дальше, и читается в конце подборки, а не поверх неё.
-        pages[-1] += (
-            f"\n\nЕщё {tail} " + core._plural(tail)
-            + " — пришлю в следующие дни, чтобы не заваливать одним сообщением."
-        )
-    digest = pages[0]
-    label = user.get("username") or user["chat_id"]
-    breakdown = ", ".join(
-        f"{core.REASONS.get(k, k)} {v}" for k, v in sorted(rejected.items())
-    )
-    print(f"\n--- {label}: подошло {len(passed)}, из них новых {len(fresh)}")
-    if breakdown:
-        print(f"    отсеяно: {breakdown}")
-    print(core.to_plain(digest))
-
-    if dry_run:
-        return len(fresh)
-
-    store.save_digest(user["chat_id"], pages)
-    tg.send(user["chat_id"], digest, core.digest_keyboard(0, len(pages)))
-    stats.track("digest_sent")
-    stats.track("vacancies_sent", len(fresh))
-
-    today = date.today().isoformat()
-    for vacancy in fresh:
-        seen[vacancy.id] = today
-    user["seen"] = core.trim_seen(seen)
-    store.save_user(user)
-    return len(fresh)
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="Дайджест вакансий для дизайнеров")
     parser.add_argument(
@@ -116,6 +64,10 @@ def main() -> int:
         action="store_true",
         help="выйти, если сегодняшняя рассылка уже состоялась (для догоняющих запусков)",
     )
+    parser.add_argument("--prepare", action="store_true",
+                        help="собрать вакансии заранее, ничего не отправляя")
+    parser.add_argument("--send-prepared", action="store_true",
+                        help="отправить только сегодняшний заранее собранный запас")
     args = parser.parse_args()
 
     load_env()
@@ -124,8 +76,19 @@ def main() -> int:
         print(core.to_plain(stats.report(days=14)))
         return 0
 
+    if args.prepare and args.send_prepared:
+        parser.error("выбери только один режим")
+    if args.send_prepared and args.dry_run:
+        parser.error("--send-prepared нельзя сочетать с --dry-run")
+    if args.send_prepared:
+        rows, collected_at = store.load_pool()
+        if rows and collected_at == daily.moscow_day():
+            daily.send_prepared()
+            return 0
+        print("Сегодняшнего запаса нет — собираю перед отправкой")
+
     today = date.today().isoformat()
-    if args.once_a_day:
+    if args.once_a_day and not (args.prepare or args.send_prepared):
         # Расписание GitHub — обещание, а не гарантия: запуск могут задержать
         # на часы или пропустить совсем. Поэтому в течение дня будят ещё
         # несколько раз, и каждый следующий проверяет, не ушла ли рассылка.
@@ -216,14 +179,22 @@ def main() -> int:
     if not args.dry_run:
         # Кладём собранное в хранилище: из этого запаса бот показывает
         # подборку новому подписчику сразу после мастера настройки.
-        store.save_pool(core.to_rows(vacancies), date.today().isoformat())
+        store.save_pool(core.to_rows(vacancies), daily.moscow_day())
         print("Запас вакансий обновлён")
+
+    if args.prepare:
+        print("Подготовка завершена; подписчикам ничего не отправлено")
+        return 0
+    if args.send_prepared:
+        daily.send_prepared()
+        return 0
 
     sent = 0
     for user in users:
         try:
-            sent += deliver(user, vacancies, args.dry_run,
-                            config.get("max_per_digest", 0))
+            sent += daily.deliver(user, vacancies,
+                                  cap=config.get("max_per_digest", 0),
+                                  dry_run=args.dry_run)
         except Exception as exc:
             # Один упавший подписчик не должен ронять рассылку остальным.
             # Чаще всего это «bot was blocked by the user».

@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import time
 import os
+import secrets
 import urllib.error
 import urllib.request
 
@@ -45,6 +46,7 @@ def _credentials() -> tuple[str | None, str]:
 USERS_KEY = "finderjob:users"
 POOL_KEY = "finderjob:pool"
 SENT_KEY = "finderjob:sent"
+DELIVERY_KEY = "finderjob:delivery"
 
 
 class StoreError(RuntimeError):
@@ -81,7 +83,8 @@ def _command(*args: object) -> object:
     # Upstash отвечает не всегда с первого раза: рукопожатие TLS иногда висит
     # до таймаута. Без повторов одна такая заминка роняла рассылку целиком —
     # и не в начале, а на середине списка подписчиков. Все наши команды
-    # (GET, SET, SMEMBERS, SADD) идемпотентны, повторять их безопасно.
+    # Большинство команд идемпотентны. Для SET NX повтор может вернуть None
+    # после успешной первой попытки; это безопасно — резервный запуск повторит.
     body = None
     for attempt in range(1, TRIES + 1):
         try:
@@ -233,11 +236,54 @@ def last_sent() -> str | None:
     return str(value) if value else None
 
 
+def claim_delivery(chat_id: int | str, day: str) -> str | None:
+    """Занять отправку одному человеку; повторный запуск пропустит его."""
+    key = f"{DELIVERY_KEY}:{day}:{chat_id}"
+    if _command("GET", key) == "sent":
+        return None
+    claim = secrets.token_hex(12)
+    if _command("SET", key, claim, "EX", 180, "NX") != "OK":
+        return None
+    return claim
+
+
+def finish_delivery(chat_id: int | str, day: str, claim: str,
+                    sent: bool) -> None:
+    key = f"{DELIVERY_KEY}:{day}:{chat_id}"
+    # Снимаем только собственную блокировку: протухший запуск не должен
+    # стереть новую. После успешной отправки отметка живёт три дня.
+    if sent:
+        _command("EVAL", """
+            if redis.call('GET', KEYS[1]) == ARGV[1] then
+                return redis.call('SET', KEYS[1], 'sent', 'EX', 259200)
+            end
+            return nil
+        """, 1, key, claim)
+    else:
+        _command("EVAL", """
+            if redis.call('GET', KEYS[1]) == ARGV[1] then
+                return redis.call('DEL', KEYS[1])
+            end
+            return nil
+        """, 1, key, claim)
+
+
+def mark_delivery_sent(chat_id: int | str, day: str) -> None:
+    _command("SET", f"{DELIVERY_KEY}:{day}:{chat_id}", "sent", "EX", 259200)
+
+
 def all_users() -> list[dict]:
     ids = _command("SMEMBERS", USERS_KEY) or []
+    if not ids:
+        return []
+    # Одна поездка к Redis вместо отдельного GET на каждого подписчика:
+    # в 09:00 это заметно сокращает время до первого сообщения.
+    raws = _command("MGET", *(_key(chat_id) for chat_id in ids)) or []
     users = []
-    for chat_id in ids:
-        user = load_user(chat_id)
-        if user:
-            users.append(user)
+    for raw in raws:
+        if raw:
+            try:
+                users.append(json.loads(raw))
+            except json.JSONDecodeError:
+                pass
     return users

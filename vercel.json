@@ -4,6 +4,10 @@
     "api/telegram.py": {
       "includeFiles": "{finderjob/**,core.py,config.json,roles.json,sources.json}",
       "maxDuration": 30
+    },
+    "api/send_digest.py": {
+      "includeFiles": "{finderjob/**,core.py,config.json,roles.json,sources.json}",
+      "maxDuration": 60
     }
   }
 }

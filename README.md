@@ -19,9 +19,11 @@
 Telegram → api/telegram.py → профиль в Upstash Redis
 ```
 
-**Ежедневный дайджест** — задача в GitHub Actions, просыпается в 07:00 МСК.
-Обход hirehi занимает около трёх минут и в лимит серверless-функции не влезает,
-поэтому живёт отдельно.
+**Ежедневный дайджест** готовится в GitHub Actions с 08:00 МСК: долгий обход
+источников сохраняет сегодняшний запас в Redis. В 09:00 QStash вызывает
+`api/send_digest.py` на Vercel: функция применяет текущие фильтры и отправляет
+готовые вакансии. Резервный запуск Actions умеет собрать запас сам, если
+утренняя подготовка не состоялась; тогда доставка придёт позже.
 
 ```
 hirehi:      sitemap-vacancies-design.xml   ~1400 вакансий с датами
@@ -183,7 +185,9 @@ hirehi подробнее всех, но прячет отклик за реги
 
 ```
 api/telegram.py      вебхук: команды, кнопки, мастер настройки
+api/send_digest.py   отправка готового дайджеста по вызову QStash
 finderjob/store.py   профили в Upstash Redis по HTTP
+finderjob/daily.py   фильтры и отправка сегодняшнего запаса
 finderjob/tg.py      Telegram Bot API
 finderjob/wizard.py  шаги мастера, клавиатуры, тексты
 finderjob/profile.py критерии пользователя и как они выглядят словами
@@ -194,7 +198,7 @@ sources/habr.py        сбор с career.habr.com
 sources/careerspace.py сбор с careerspace.app
 sources/hh.py          сбор с hh.ru через RSS
 sources/companies.py   карьерные сайты компаний
-main.py              ежедневная рассылка (запускается из Actions)
+main.py              сбор вакансий (запускается из Actions)
 ```
 
 ## Запуск локально
@@ -213,6 +217,7 @@ KV_REST_API_TOKEN=...
 python3 main.py --dry-run              # посмотреть, ничего не отправляя
 python3 main.py --dry-run --limit 20   # быстрая проверка на 20 страницах
 python3 main.py --dry-run --days 7     # заглянуть на неделю назад
+python3 main.py --prepare             # собрать запас без отправки
 ```
 
 `--dry-run` не отправляет сообщения и **не трогает** память подписчиков,
@@ -241,7 +246,8 @@ python3 main.py --stats               # аналитика за две неде�
 ## Раскатка
 
 **Vercel** собирает вебхук из этого репозитория при каждом пуше в `main`.
-Нужные переменные: `TELEGRAM_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` и пара
+Нужные переменные: `TELEGRAM_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
+`DIGEST_SEND_SECRET` и пара
 `KV_REST_API_URL` / `KV_REST_API_TOKEN` от хранилища.
 
 Вебхук регистрируется один раз:
@@ -255,9 +261,15 @@ curl -X POST "https://api.telegram.org/bot<ТОКЕН>/setWebhook" \
 `secret_token` telegram присылает обратно в заголовке при каждом запросе —
 так функция отличает настоящие апдейты от чужих.
 
-**GitHub Actions** запускает рассылку по расписанию. В секретах репозитория
-нужны `TELEGRAM_TOKEN`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`.
-Время меняется в `.github/workflows/daily.yml`.
+**GitHub Actions** готовит вакансии в 08:00 МСК и страхует отправку. В секретах
+репозитория нужны `TELEGRAM_TOKEN`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`.
+QStash должен вызывать `workflow_dispatch` с `{"ref":"main","inputs":{"mode":"prepare"}}`
+в 08:00 МСК (`0 5 * * *` UTC) и `POST /api/send_digest` в 09:00 МСК
+(`0 6 * * *` UTC). В настройках QStash нужен заголовок
+`Upstash-Forward-Authorization: Bearer <DIGEST_SEND_SECRET>`: до функции
+дойдёт обычный `Authorization`.
+Существующие QStash-вызовы Actions в 09:00 и 12:00 остаются страховкой.
+Повторные запуски не дублируют уже отправленное.
 
 ## Что дальше
 
