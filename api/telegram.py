@@ -228,6 +228,15 @@ def handle_callback(callback: dict) -> None:
         tg.answer_callback(callback["id"])
         return
 
+    if data == "filters:open":
+        user = _user(chat)
+        if _configured(user):
+            _show_filters(user, chat["id"])
+        else:
+            _open_step(user, user.get("step") or "direction", "setup")
+        tg.answer_callback(callback["id"])
+        return
+
     user = _user(chat)
     profile = prof.migrate(user.get("draft_profile") or user["profile"])
     message_id = message.get("message_id")

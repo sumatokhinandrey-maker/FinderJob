@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Разовая настройка описания бота и меню команд без сообщений подписчикам.
+"""Разовая настройка описания бота и меню без сообщений подписчикам.
 
 Описание — то, что человек читает в пустом чате до кнопки «Начать».
 
@@ -35,7 +35,12 @@ def main() -> int:
 
     tg.call("setMyDescription", description=wizard.DESCRIPTION)
     tg.call("setMyShortDescription", short_description=wizard.DESCRIPTION)
-    tg.call("deleteMyCommands")
+    # ReplyKeyboardMarkup Telegram может скрыть на стороне клиента. Команда
+    # в системном меню остаётся доступной без отправки служебных сообщений.
+    tg.call("setMyCommands", commands=[
+        {"command": "filters", "description": "Открыть фильтры вакансий"},
+    ])
+    tg.call("setChatMenuButton", menu_button={"type": "commands"})
 
     users = store.all_users()
     cleared = failed = 0
@@ -53,7 +58,7 @@ def main() -> int:
         time.sleep(0.04)
 
     print("описание:", tg.call("getMyDescription")["description"])
-    print(f"Меню команд очищено в {cleared} чатах; сообщения не отправлялись.")
+    print(f"Фильтры добавлены в меню; старые команды очищены в {cleared} чатах; сообщений нет.")
     if failed:
         print(f"Не удалось обновить: {failed} операций.")
         return 1

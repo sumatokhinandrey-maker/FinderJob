@@ -477,16 +477,16 @@ def build_pages(vacancies: list[Vacancy], roles: list[str] | None = None,
     return pages
 
 
-def digest_keyboard(index: int, pages: int) -> list[list[dict]] | None:
-    """Только навигация: на первой странице одна кнопка, дальше две."""
-    if pages <= 1:
-        return None
+def digest_keyboard(index: int, pages: int) -> list[list[dict]]:
+    """Навигация по подборке и постоянный вход в фильтры."""
     row = []
-    if index > 0:
+    if pages > 1 and index > 0:
         row.append({"text": "← Назад", "callback_data": f"dg:{index - 1}"})
-    if index < pages - 1:
+    if pages > 1 and index < pages - 1:
         row.append({"text": "Далее →", "callback_data": f"dg:{index + 1}"})
-    return [row]
+    keyboard = [row] if row else []
+    keyboard.append([{"text": "⚙️ Фильтры", "callback_data": "filters:open"}])
+    return keyboard
 
 
 def build_digest(vacancies: list[Vacancy], roles: list[str] | None = None,
