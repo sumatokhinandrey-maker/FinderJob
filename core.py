@@ -478,7 +478,7 @@ def build_pages(vacancies: list[Vacancy], roles: list[str] | None = None,
 
 
 def digest_keyboard(index: int, pages: int) -> list[list[dict]]:
-    """Навигация по страницам подборки, когда их несколько."""
+    """Навигация у старых подборок с inline-кнопками."""
     row = []
     if pages > 1 and index > 0:
         row.append({"text": "← Назад", "callback_data": f"dg:{index - 1}"})

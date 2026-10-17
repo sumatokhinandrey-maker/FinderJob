@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 import core
 from finderjob import profile as prof
-from finderjob import stats, store, tg
+from finderjob import stats, store, tg, wizard
 
 MOSCOW = ZoneInfo("Europe/Moscow")
 NEWS_DAY = "2026-10-18"
@@ -23,11 +23,10 @@ def send_news_invitation(users: list[dict], day: str) -> None:
         'Подпишись на новостной канал Finder Job, чтобы быть в курсе '
         'обновлений и новых функций.'
     )
-    keyboard = [[{
-        "text": "FinderJob",
-        "url": NEWS_URL,
-        "icon_custom_emoji_id": "5875465628285931233",
-    }]]
+    text += (
+        '\n\n<tg-emoji emoji-id="5875465628285931233">✈️</tg-emoji> '
+        f'<a href="{NEWS_URL}">FinderJob</a>'
+    )
     for user in users:
         chat_id = user["chat_id"]
         if not store.delivery_sent(chat_id, day):
@@ -36,7 +35,7 @@ def send_news_invitation(users: list[dict], day: str) -> None:
         if not claim:
             continue
         try:
-            tg.send(chat_id, text, keyboard)
+            tg.send(chat_id, text, wizard.menu_keyboard(user.get("digest_page_count", 1)))
             store.finish_delivery(chat_id, f"{day}:news", claim, True)
         except Exception as exc:
             print(f"  ! приглашение не доставлено {chat_id}: {exc}")
@@ -79,7 +78,12 @@ def deliver(user: dict, vacancies: list, cap: int = 0,
         return len(fresh)
 
     store.save_digest(user["chat_id"], pages)
-    tg.send(user["chat_id"], digest, core.digest_keyboard(0, len(pages)))
+    user["digest_message_id"] = tg.send(
+        user["chat_id"], digest, wizard.menu_keyboard(len(pages))
+    )
+    user["digest_page"] = 0
+    user["digest_page_count"] = len(pages)
+    user["menu_installed"] = wizard.MENU_VERSION
     if claim:
         # Ставим отметку сразу после ответа Telegram: ошибки статистики или
         # сохранения seen не должны превращаться в повторное сообщение.

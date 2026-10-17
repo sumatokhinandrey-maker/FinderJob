@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import main
 from api.send_digest import handler
-from finderjob import daily, store
+from finderjob import daily, store, wizard
 
 
 class MemoryRedis:
@@ -34,6 +34,22 @@ class MemoryRedis:
 
 
 class DailyTests(unittest.TestCase):
+    def test_single_page_replaces_previous_digest(self):
+        with patch.object(store, "_command") as command:
+            store.save_digest(42, ["Новая подборка"])
+        self.assertEqual(command.call_args.args[:2], ("SET", "finderjob:digest:42"))
+
+    def test_daily_digest_installs_filters_on_same_message(self):
+        user = {"chat_id": 42, "profile": {"roles": ["design.product"]}, "seen": {}}
+        with patch.object(store, "save_digest"), \
+             patch.object(store, "save_user"), \
+             patch.object(daily.stats, "track"), \
+             patch.object(daily.tg, "send", return_value=123) as send:
+            self.assertEqual(daily.deliver(user, []), 0)
+        send.assert_called_once()
+        self.assertEqual(send.call_args.args[2], wizard.menu_keyboard())
+        self.assertEqual(user["digest_message_id"], 123)
+
     def test_endpoint_rejects_unauthorized_request(self):
         request = handler.__new__(handler)
         request.headers = {"Authorization": "Bearer wrong"}
@@ -105,10 +121,8 @@ class DailyTests(unittest.TestCase):
         send.assert_called_once()
         self.assertEqual(send.call_args.args[0], 1)
         self.assertIn('emoji-id="5206607081334906820"', send.call_args.args[1])
-        button = send.call_args.args[2][0][0]
-        self.assertEqual(button["text"], "FinderJob")
-        self.assertEqual(button["url"], "https://t.me/finderjobupdate")
-        self.assertEqual(button["icon_custom_emoji_id"], "5875465628285931233")
+        self.assertIn('href="https://t.me/finderjobupdate"', send.call_args.args[1])
+        self.assertEqual(send.call_args.args[2], wizard.menu_keyboard())
 
 
 if __name__ == "__main__":

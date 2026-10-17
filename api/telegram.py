@@ -28,7 +28,7 @@ STOPPED = (
 )
 
 
-def first_digest(user: dict, install_menu: bool = False) -> None:
+def first_digest(user: dict) -> None:
     """Подборка сразу после мастера — из запаса, собранного последней рассылкой.
     Показанное отмечаем, чтобы утром эти же вакансии не пришли повторно."""
     rows, collected_at = store.load_pool()
@@ -36,11 +36,10 @@ def first_digest(user: dict, install_menu: bool = False) -> None:
         tg.send(
             user["chat_id"],
             wizard.EMPTY_POOL,
-            wizard.menu_keyboard() if install_menu else None,
+            wizard.menu_keyboard(),
         )
-        if install_menu:
-            user["menu_installed"] = wizard.MENU_VERSION
-            store.save_user(user)
+        user["menu_installed"] = wizard.MENU_VERSION
+        store.save_user(user)
         return
 
     vacancies = core.fill_grades(core.from_rows(rows))
@@ -50,12 +49,14 @@ def first_digest(user: dict, install_menu: bool = False) -> None:
 
     pages = core.build_pages(fresh)
     store.save_digest(user["chat_id"], pages)
-    tg.send(user["chat_id"], pages[0], core.digest_keyboard(0, len(pages)))
+    user["digest_message_id"] = tg.send(
+        user["chat_id"], pages[0], wizard.menu_keyboard(len(pages))
+    )
+    user["digest_page"] = 0
+    user["digest_page_count"] = len(pages)
+    user["menu_installed"] = wizard.MENU_VERSION
     if collected_at == daily.moscow_day():
         store.mark_delivery_sent(user["chat_id"], collected_at)
-    if install_menu and user.get("menu_installed") != wizard.MENU_VERSION:
-        tg.send(user["chat_id"], wizard.MENU_PROMPT, wizard.menu_keyboard())
-        user["menu_installed"] = wizard.MENU_VERSION
     stats.track("digest_sent")
     stats.track("vacancies_sent", len(fresh))
 
@@ -122,14 +123,7 @@ def _configured(user: dict) -> bool:
     return bool(user.get("setup_complete") or (user.get("profile") or {}).get("grades"))
 
 
-def _ensure_menu_keyboard(user: dict, chat_id: int, force: bool = False) -> None:
-    if user.get("menu_installed") == wizard.MENU_VERSION and not force:
-        return
-    tg.send(chat_id, wizard.MENU_PROMPT, wizard.menu_keyboard())
-    user["menu_installed"] = wizard.MENU_VERSION
-
-
-def _show_filters(user: dict, chat_id: int, install_menu: bool = False) -> None:
+def _show_filters(user: dict, chat_id: int) -> None:
     user.pop("draft_profile", None)
     user["awaiting"] = None
     user["mode"] = "edit"
@@ -137,10 +131,7 @@ def _show_filters(user: dict, chat_id: int, install_menu: bool = False) -> None:
     body, keyboard = wizard.render_settings(
         user["profile"], user.get("pending_first_search", False)
     )
-    if install_menu or user.get("menu_installed") != wizard.MENU_VERSION:
-        _ensure_menu_keyboard(user, chat_id, force=install_menu)
     tg.send(chat_id, body, keyboard)
-    user["menu_installed"] = wizard.MENU_VERSION
     store.save_user(user)
 
 
@@ -152,7 +143,8 @@ def handle_message(message: dict) -> None:
 
     # Команда или кнопка меню своё дело сделали, в переписке оставлять их
     # не нужно: ответ бота показывает результат. Убираем до разбора.
-    if (text.startswith("/") or text in wizard.MENU_BUTTON_TEXTS) and message.get("message_id"):
+    if (text.startswith("/") or text in (*wizard.MENU_BUTTON_TEXTS,
+                                         wizard.PREV_PAGE_TEXT, wizard.NEXT_PAGE_TEXT)) and message.get("message_id"):
         tg.delete(chat["id"], message["message_id"])
 
     if text.startswith("/stop"):
@@ -163,12 +155,15 @@ def handle_message(message: dict) -> None:
 
     user = _user(chat)
 
+    if text in (wizard.PREV_PAGE_TEXT, wizard.NEXT_PAGE_TEXT):
+        _turn_page_from_keyboard(user, chat["id"], text)
+        return
+
     if text.startswith("/start"):
         stats.track("start")
         if _configured(user):
-            _show_filters(user, chat["id"], install_menu=True)
+            _show_filters(user, chat["id"])
         elif user.get("step"):
-            _ensure_menu_keyboard(user, chat["id"], force=True)
             _open_step(user, user["step"], "setup")
         else:
             tg.send(chat["id"], wizard.WELCOME, wizard.menu_keyboard())
@@ -178,11 +173,10 @@ def handle_message(message: dict) -> None:
 
     if text in (*wizard.MENU_BUTTON_TEXTS, "/filters", "/settings"):
         if not _configured(user):
-            _ensure_menu_keyboard(user, chat["id"], force=text.startswith("/"))
             _open_step(user, user.get("step") or "direction", "setup")
             return
         stats.track("settings")
-        _show_filters(user, chat["id"], install_menu=text.startswith("/"))
+        _show_filters(user, chat["id"])
         return
 
     if user.get("awaiting") and not text.startswith("/"):
@@ -193,8 +187,9 @@ def handle_message(message: dict) -> None:
         tg.send(chat["id"], stats.report())
         return
 
-    _ensure_menu_keyboard(user, chat["id"])
-    tg.send(chat["id"], wizard.HELP)
+    tg.send(chat["id"], wizard.HELP,
+            wizard.menu_keyboard(user.get("digest_page_count", 1)))
+    user["menu_installed"] = wizard.MENU_VERSION
     store.save_user(user)
 
 
@@ -213,6 +208,29 @@ def _turn_page(chat_id: int, message_id: int | None, where: str) -> None:
         return
     tg.edit(chat_id, message_id, pages[index],
             core.digest_keyboard(index, len(pages)))
+
+
+def _turn_page_from_keyboard(user: dict, chat_id: int, direction: str) -> None:
+    pages = store.load_digest(chat_id)
+    old_message_id = user.get("digest_message_id")
+    if not pages or not old_message_id:
+        return
+    index = user.get("digest_page", 0) + (1 if direction == wizard.NEXT_PAGE_TEXT else -1)
+    if not 0 <= index < len(pages):
+        return
+    _send_digest_page(user, chat_id, pages, index)
+
+
+def _send_digest_page(user: dict, chat_id: int, pages: list[str], index: int) -> None:
+    old_message_id = user.get("digest_message_id")
+    new_message_id = tg.send(chat_id, pages[index], wizard.menu_keyboard(len(pages)))
+    user["digest_message_id"] = new_message_id
+    user["digest_page"] = index
+    user["digest_page_count"] = len(pages)
+    user["menu_installed"] = wizard.MENU_VERSION
+    store.save_user(user)
+    if old_message_id and old_message_id != new_message_id:
+        tg.delete(chat_id, old_message_id)
 
 
 def handle_callback(callback: dict) -> None:
@@ -251,6 +269,10 @@ def handle_callback(callback: dict) -> None:
         store.save_user(user)
         if message_id:
             tg.delete(chat["id"], message_id)
+        pages = store.load_digest(chat["id"])
+        if pages:
+            index = min(max(user.get("digest_page", 0), 0), len(pages) - 1)
+            _send_digest_page(user, chat["id"], pages, index)
         tg.answer_callback(callback["id"])
         return
 
@@ -415,7 +437,7 @@ def handle_callback(callback: dict) -> None:
     tg.answer_callback(callback["id"], notice)
 
     if finished:
-        first_digest(user, install_menu=True)
+        first_digest(user)
     elif edited:
         # Правка критерия молча — это правка вслепую: человек не знает,
         # что она дала. Показываем подборку по новым критериям сразу,

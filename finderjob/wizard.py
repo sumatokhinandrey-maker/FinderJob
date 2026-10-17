@@ -54,10 +54,9 @@ EMPTY_POOL = (
 )
 
 HELP = "Чтобы открыть или настроить подборку, нажми «Фильтры» внизу."
-MENU_PROMPT = "Чтобы открыть или изменить критерии, нажми «Фильтры» внизу."
 MENU_BUTTON_TEXT = "Фильтры"
 MENU_BUTTON_TEXTS = (MENU_BUTTON_TEXT, "🎛️ Фильтры")  # старый fallback ещё может быть на экране
-MENU_VERSION = 3  # обновляем reply-клавиатуру при следующем действии пользователя
+MENU_VERSION = 3
 
 # Пороги зарплаты. Нижняя граница, а не вилка: верхняя отсекала бы и тех,
 # кто платит больше потолка, — на этом уже обжигались.
@@ -277,9 +276,17 @@ def format_region_keyboard() -> list[list[dict]]:
     ]
 
 
-def menu_keyboard() -> dict:
+PREV_PAGE_TEXT = "← Назад"
+NEXT_PAGE_TEXT = "Далее →"
+
+
+def menu_keyboard(pages: int = 1) -> dict:
+    rows = []
+    if pages > 1:
+        rows.append([{"text": PREV_PAGE_TEXT}, {"text": NEXT_PAGE_TEXT}])
+    rows.append([{"text": MENU_BUTTON_TEXT}])
     return {
-        "keyboard": [[{"text": MENU_BUTTON_TEXT}]],
+        "keyboard": rows,
         "resize_keyboard": True,
         "is_persistent": True,
         "one_time_keyboard": False,
