@@ -10,3 +10,4 @@ FILTER_ICONS = {
 }
 
 FALLBACK_BY_ID = {custom_id: emoji for emoji, custom_id in FILTER_ICONS.values()}
+FALLBACK_BY_ID["5875465628285931233"] = "✈️"

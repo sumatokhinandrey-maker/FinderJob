@@ -247,6 +247,11 @@ def claim_delivery(chat_id: int | str, day: str) -> str | None:
     return claim
 
 
+def delivery_sent(chat_id: int | str, day: str) -> bool:
+    """Дайджест за указанный день уже принят Telegram."""
+    return _command("GET", f"{DELIVERY_KEY}:{day}:{chat_id}") == "sent"
+
+
 def finish_delivery(chat_id: int | str, day: str, claim: str,
                     sent: bool) -> None:
     key = f"{DELIVERY_KEY}:{day}:{chat_id}"

@@ -92,6 +92,24 @@ class DailyTests(unittest.TestCase):
             self.assertEqual(daily.send_prepared(), (1, 3))
             self.assertEqual(calls, [1, 2, 2])
 
+    def test_news_invitation_is_after_digest_and_only_once(self):
+        redis = MemoryRedis()
+        users = [{"chat_id": 1}, {"chat_id": 2}]
+        day = daily.NEWS_DAY
+        redis.values[f"{store.DELIVERY_KEY}:{day}:1"] = "sent"
+        with patch.object(store, "_command", side_effect=redis.command), \
+             patch.object(daily.tg, "send") as send:
+            daily.send_news_invitation(users, day)
+            daily.send_news_invitation(users, day)
+            daily.send_news_invitation(users, "2026-10-19")
+        send.assert_called_once()
+        self.assertEqual(send.call_args.args[0], 1)
+        self.assertIn('emoji-id="5206607081334906820"', send.call_args.args[1])
+        button = send.call_args.args[2][0][0]
+        self.assertEqual(button["text"], "FinderJob")
+        self.assertEqual(button["url"], "https://t.me/finderjobupdate")
+        self.assertEqual(button["icon_custom_emoji_id"], "5875465628285931233")
+
 
 if __name__ == "__main__":
     unittest.main()

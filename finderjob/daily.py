@@ -10,6 +10,37 @@ from finderjob import profile as prof
 from finderjob import stats, store, tg
 
 MOSCOW = ZoneInfo("Europe/Moscow")
+NEWS_DAY = "2026-10-18"
+NEWS_URL = "https://t.me/finderjobupdate"
+
+
+def send_news_invitation(users: list[dict], day: str) -> None:
+    """Разовое приглашение после дайджеста; повторный запуск его не дублирует."""
+    if day != NEWS_DAY or not NEWS_URL:
+        return
+    text = (
+        '<tg-emoji emoji-id="5206607081334906820">✔️</tg-emoji> '
+        'Подпишись на новостной канал Finder Job, чтобы быть в курсе '
+        'обновлений и новых функций.'
+    )
+    keyboard = [[{
+        "text": "FinderJob",
+        "url": NEWS_URL,
+        "icon_custom_emoji_id": "5875465628285931233",
+    }]]
+    for user in users:
+        chat_id = user["chat_id"]
+        if not store.delivery_sent(chat_id, day):
+            continue
+        claim = store.claim_delivery(chat_id, f"{day}:news")
+        if not claim:
+            continue
+        try:
+            tg.send(chat_id, text, keyboard)
+            store.finish_delivery(chat_id, f"{day}:news", claim, True)
+        except Exception as exc:
+            print(f"  ! приглашение не доставлено {chat_id}: {exc}")
+            store.finish_delivery(chat_id, f"{day}:news", claim, False)
 
 
 def moscow_day() -> str:
@@ -94,5 +125,6 @@ def send_prepared() -> tuple[int, int]:
         stats.track("digest_sent", sent_users, today)
         stats.track("vacancies_sent", sent_vacancies, today)
     store.mark_sent(today)
+    send_news_invitation(users, today)
     print(f"Отправлено подписчикам: {sent_users}; вакансий: {sent_vacancies}")
     return sent_users, sent_vacancies
