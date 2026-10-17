@@ -32,7 +32,7 @@ SOURCE_GROUPS = {
         "label": "Агрегаторы",
         "sources": ["hirehi", "finder", "habr", "getmatch", "careerspace", "designer"],
     },
-    "hh": {"label": "HH.RU", "sources": ["hh"]},
+    "hh": {"label": "hh.ru", "sources": ["hh"]},
     "telegram": {"label": "Telegram", "sources": ["telegram"]},
     "linkedin": {"label": "LinkedIn", "sources": ["linkedin"]},
 }

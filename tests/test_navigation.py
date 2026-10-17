@@ -62,7 +62,7 @@ class NavigationTests(unittest.TestCase):
             "💰 Вилка: от 150 000 ₽\n"
             "🏠 Формат: удалёнка, гибрид\n"
             "📍 Регион: любой\n"
-            "🔎 Источники: HH.RU\n\nЧто изменить?"
+            "🔎 Источники: hh.ru\n\nЧто изменить?"
         ))
         labels = ["Профессия", "Грейд", "Вилка", "Формат", "Регион", "Источники"]
         keys = ["profession", "grade", "salary", "format", "region", "sources"]
