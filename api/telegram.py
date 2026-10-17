@@ -134,7 +134,9 @@ def _show_filters(user: dict, chat_id: int, install_menu: bool = False) -> None:
     user["awaiting"] = None
     user["mode"] = "edit"
     user["step"] = None
-    body, keyboard = wizard.render_settings(user["profile"])
+    body, keyboard = wizard.render_settings(
+        user["profile"], user.get("pending_first_search", False)
+    )
     if install_menu or not user.get("menu_installed"):
         _ensure_menu_keyboard(user, chat_id, force=install_menu)
     tg.send(chat_id, body, keyboard)
@@ -266,26 +268,44 @@ def handle_callback(callback: dict) -> None:
 
     elif data == "search:find":
         user.pop("draft_profile", None)
-        user["setup_complete"] = True
-        user["pending_first_search"] = False
         user["mode"] = "edit"
         user["step"] = None
-        body, keyboard = "Ищу вакансии…", []
-        finished = True
-        stats.track("wizard_done")
+        if user.get("setup_complete") and not user.get("pending_first_search"):
+            body, keyboard = wizard.render_settings(user["profile"])
+        else:
+            user["setup_complete"] = True
+            user["pending_first_search"] = False
+            body, keyboard = "Ищу вакансии…", []
+            finished = True
+            stats.track("wizard_done")
 
     elif data == "search:edit":
         user.pop("draft_profile", None)
         user["mode"] = "edit"
         user["step"] = None
-        body, keyboard = wizard.render_settings(profile)
+        body, keyboard = wizard.render_settings(
+            profile, user.get("pending_first_search", False)
+        )
+
+    elif data == "search:review":
+        user.pop("draft_profile", None)
+        profile = user["profile"]
+        user["step"] = None
+        if user.get("pending_first_search"):
+            user["mode"] = "review"
+            body, keyboard = wizard.render_review(profile)
+        else:
+            user["mode"] = "edit"
+            body, keyboard = wizard.render_settings(profile)
 
     elif data == "ed:menu":
         user.pop("draft_profile", None)
         profile = user["profile"]
         user["mode"] = "edit"
         user["step"] = None
-        body, keyboard = wizard.render_settings(profile)
+        body, keyboard = wizard.render_settings(
+            profile, user.get("pending_first_search", False)
+        )
 
     elif data == "ed:more":
         user["draft_profile"] = profile = deepcopy(user["profile"])
@@ -304,7 +324,9 @@ def handle_callback(callback: dict) -> None:
     elif data == "reset:cancel":
         user["mode"] = "edit"
         user["step"] = None
-        body, keyboard = wizard.render_settings(profile)
+        body, keyboard = wizard.render_settings(
+            profile, user.get("pending_first_search", False)
+        )
 
     elif data == "reset:confirm":
         user.pop("draft_profile", None)
@@ -338,7 +360,9 @@ def handle_callback(callback: dict) -> None:
             user.pop("draft_profile", None)
             profile = user["profile"]
             user["step"] = None
-            body, keyboard = wizard.render_settings(profile)
+            body, keyboard = wizard.render_settings(
+                profile, user.get("pending_first_search", False)
+            )
         else:
             earlier = wizard.prev_step(data[3:], profile) or "direction"
             user["step"] = earlier
@@ -357,8 +381,7 @@ def handle_callback(callback: dict) -> None:
                 user.pop("draft_profile", None)
                 user["mode"] = "review"
                 user["step"] = None
-                body = prof.summary(profile) + "\n\n" + wizard.REVIEW_PROMPT
-                keyboard = wizard.done_keyboard()
+                body, keyboard = wizard.render_review(profile)
             else:
                 user["profile"] = profile
                 user.pop("draft_profile", None)
@@ -371,8 +394,7 @@ def handle_callback(callback: dict) -> None:
             if following:
                 body, keyboard = wizard.render(following, profile, "setup")
             else:
-                body = prof.summary(profile) + "\n\n" + wizard.REVIEW_PROMPT
-                keyboard = wizard.done_keyboard()
+                body, keyboard = wizard.render_review(profile)
                 user["pending_first_search"] = True
                 user["mode"] = "review"
 

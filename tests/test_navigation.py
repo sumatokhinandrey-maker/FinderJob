@@ -86,6 +86,67 @@ class NavigationTests(unittest.TestCase):
         self.assertIn("Шаг 1 из 6. Направление", edit.call_args.args[2])
         send.assert_not_called()
 
+    def test_first_search_review_can_be_reopened_after_back_and_edit(self):
+        chosen = profile.blank()
+        chosen.update({"directions": ["design"],
+                       "roles": ["design.product"], "grades": ["middle"]})
+        user = {"chat_id": 42, "profile": chosen, "mode": "setup",
+                "step": "region", "menu_installed": True}
+
+        def press(data):
+            telegram.handle_callback({
+                "id": "callback", "data": data,
+                "message": {"chat": {"id": 42}, "message_id": 9},
+            })
+            return edit.call_args.args[2:]
+
+        with patch.object(telegram, "_user", return_value=user), \
+             patch.object(telegram.store, "save_user"), \
+             patch.object(telegram.tg, "edit") as edit, \
+             patch.object(telegram.tg, "send") as send, \
+             patch.object(telegram.tg, "answer_callback"), \
+             patch.object(telegram, "first_digest") as digest:
+            body, keyboard = press("nx:region")
+            self.assertIn("Проверь критерии", body)
+            self.assertEqual(keyboard[0][0]["callback_data"], "search:find")
+
+            body, keyboard = press("search:edit")
+            self.assertEqual(keyboard[-1][0]["callback_data"], "search:review")
+            press("ed:grade")
+            body, keyboard = press("bk:grade")
+            self.assertEqual(keyboard[-1][0]["text"], "Вернуться к проверке")
+            body, keyboard = press("search:review")
+            self.assertIn("Проверь критерии", body)
+            self.assertEqual(keyboard[0][0]["callback_data"], "search:find")
+
+            press("search:edit")
+            press("ed:salary")
+            press("ts:150000")
+            body, keyboard = press("nx:salary")
+            self.assertIn("от 150 000 ₽", body)
+            self.assertEqual(user["mode"], "review")
+            self.assertEqual(keyboard[0][0]["callback_data"], "search:find")
+            digest.assert_not_called()
+            send.assert_not_called()
+
+            press("search:find")
+            digest.assert_called_once_with(user, install_menu=True)
+            self.assertFalse(user["pending_first_search"])
+            body, keyboard = press("search:find")
+            self.assertIn("Фильтры", body)
+            self.assertEqual(keyboard[-1][0]["callback_data"], "filters:close")
+            digest.assert_called_once()
+
+    def test_filters_reply_button_keeps_return_to_pending_review(self):
+        user = {"chat_id": 42, "profile": profile.blank(),
+                "pending_first_search": True, "menu_installed": True}
+        with patch.object(telegram.tg, "send") as send, \
+             patch.object(telegram.store, "save_user"):
+            telegram._show_filters(user, 42)
+        self.assertEqual(
+            send.call_args.args[2][-1][0]["callback_data"], "search:review"
+        )
+
     def test_single_page_digest_has_no_empty_inline_markup(self):
         with patch.object(tg, "call", return_value={"message_id": 1}) as call:
             tg.send(42, "Дайджест", core.digest_keyboard(0, 1))

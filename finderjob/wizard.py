@@ -251,7 +251,7 @@ def keyboard(step: str, profile: dict, mode: str) -> list[list[dict]]:
     return []
 
 
-def settings_keyboard() -> list[list[dict]]:
+def settings_keyboard(pending_first_search: bool = False) -> list[list[dict]]:
     """Меню карточки фильтров: каждая кнопка ведёт к точечной правке."""
     return [
         [_filter_button("Профессия", "ed:direction", "profession"),
@@ -261,7 +261,8 @@ def settings_keyboard() -> list[list[dict]]:
         [_filter_button("Регион", "ed:region", "region"),
          _filter_button("Источники", "ed:more", "sources")],
         [_button("Сбросить", "reset:ask")],
-        [_button("Закрыть", "filters:close")],
+        [_button("Вернуться к проверке", "search:review")]
+        if pending_first_search else [_button("Закрыть", "filters:close")],
     ]
 
 
@@ -301,8 +302,17 @@ def render(step: str, profile: dict, mode: str) -> tuple[str, list[list[dict]]]:
     return body, keyboard(step, profile, mode)
 
 
-def render_settings(profile: dict) -> tuple[str, list[list[dict]]]:
-    return prof.summary(profile) + "\n\nЧто изменить?", settings_keyboard()
+def render_settings(
+    profile: dict, pending_first_search: bool = False
+) -> tuple[str, list[list[dict]]]:
+    return (
+        prof.summary(profile) + "\n\nЧто изменить?",
+        settings_keyboard(pending_first_search),
+    )
+
+
+def render_review(profile: dict) -> tuple[str, list[list[dict]]]:
+    return prof.summary(profile) + "\n\n" + REVIEW_PROMPT, done_keyboard()
 
 
 def render_more(profile: dict) -> tuple[str, list[list[dict]]]:
