@@ -252,7 +252,6 @@ def describe_sources(profile: dict) -> str:
 
 def summary(profile: dict) -> str:
     from html import escape
-    from finderjob import wizard
 
     roles = escape(describe_roles(profile))
     grades = escape(describe_grades(profile).lower())
@@ -273,17 +272,10 @@ def summary(profile: dict) -> str:
         f"• {roles}\n"
         f"⚡️ Грейд: {grades}\n"
         f"💰 Вилка: {salary}\n"
-        f"💼 Формат: {escape(work)}\n"
-        f"📍 Регион: {escape(region)}"
+        f"🏠 Формат: {escape(work)}\n"
+        f"📍 Регион: {escape(region)}\n"
+        f"🔎 Источники: {escape(describe_sources(profile))}"
     )
-    sources = set(profile.get("sources") or [])
-    available_sources = {
-        source
-        for group in wizard.SOURCE_GROUPS.values()
-        for source in group["sources"]
-    }
-    if sources and not available_sources.issubset(sources):
-        body += f"\nИсточники: {escape(describe_sources(profile))}"
     return body
 
 

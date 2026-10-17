@@ -35,8 +35,8 @@ def main() -> int:
 
     tg.call("setMyDescription", description=wizard.DESCRIPTION)
     tg.call("setMyShortDescription", short_description=wizard.DESCRIPTION)
-    # Убираем системный список команд: навигация остаётся на клавиатуре
-    # «Фильтры» и в кнопке под каждым дайджестом.
+    # Очищаем команды. Telegram может оставить системную кнопку меню,
+    # но список за ней пуст; вход в настройки — клавиатура «Фильтры».
     tg.call("deleteMyCommands")
     tg.call("setChatMenuButton", menu_button={"type": "default"})
 

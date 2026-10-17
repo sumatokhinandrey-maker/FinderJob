@@ -4,14 +4,14 @@
 не простыню из десяти сообщений, а один экран, который меняется под нажатия.
 
 Кнопка «Любая»/«Любой» стирает критерий и ведёт дальше: незаполненное поле
-ничего не отсекает. У грейда её нет — там выбор обязателен, потому что
-неназванный уровень был главным источником нерелевантных вакансий.
+ничего не отсекает. У грейда и источников её нет: там оставляем точечный выбор.
 """
 
 from __future__ import annotations
 
 import re
 
+from finderjob import icons
 from finderjob import profile as prof
 from finderjob import taxonomy
 
@@ -23,7 +23,6 @@ SKIP_LABEL = {
     "salary": "Любая",
     "format": "Выбрать всё",
     "region": "Любой",
-    "sources": "Все",
 }
 
 CHECK = "✓ "  # галочка перед выбранным пунктом
@@ -86,6 +85,12 @@ def _button(text: str, data: str) -> dict:
     return {"text": text, "callback_data": data}
 
 
+def _filter_button(text: str, data: str, icon: str) -> dict:
+    button = _button(text, data)
+    button["icon_custom_emoji_id"] = icons.FILTER_ICONS[icon][1]
+    return button
+
+
 def _rows(buttons: list[dict], per_row: int = 2) -> list[list[dict]]:
     return [buttons[i : i + per_row] for i in range(0, len(buttons), per_row)]
 
@@ -108,6 +113,14 @@ def _toggle_from_all(profile: dict, field: str, value: str, everything: list[str
         current.append(value)
     # Сняли всё до последнего — это то же самое, что «подходит любой».
     profile[field] = [] if not current else current
+
+
+def _set_sources(profile: dict, selected: list[str]) -> bool:
+    """Не даём снять все источники; пустой список в старых профилях значит все."""
+    if not selected:
+        return False
+    profile["sources"] = [] if set(selected) == set(_all_sources()) else selected
+    return True
 
 
 # --------------------------------------------------------------------------
@@ -242,9 +255,12 @@ def keyboard(step: str, profile: dict, mode: str) -> list[list[dict]]:
 def settings_keyboard() -> list[list[dict]]:
     """Меню карточки фильтров: каждая кнопка ведёт к точечной правке."""
     return [
-        [_button("Профессия", "ed:direction"), _button("Грейд", "ed:grade")],
-        [_button("Вилка", "ed:salary"), _button("Формат", "ed:format")],
-        [_button("Регион", "ed:region"), _button("Источники", "ed:more")],
+        [_filter_button("Профессия", "ed:direction", "profession"),
+         _filter_button("Грейд", "ed:grade", "grade")],
+        [_filter_button("Вилка", "ed:salary", "salary"),
+         _filter_button("Формат", "ed:format", "format")],
+        [_filter_button("Регион", "ed:region", "region"),
+         _filter_button("Источники", "ed:more", "sources")],
         [_button("Сбросить", "reset:ask")],
         [_button("Закрыть", "filters:close")],
     ]
@@ -252,7 +268,8 @@ def settings_keyboard() -> list[list[dict]]:
 
 def format_region_keyboard() -> list[list[dict]]:
     return [
-        [_button("Формат", "ed:format"), _button("Регион", "ed:region")],
+        [_filter_button("Формат", "ed:format", "format"),
+         _filter_button("Регион", "ed:region", "region")],
         [_button("Назад", "ed:menu")],
     ]
 
@@ -327,6 +344,8 @@ def _toggle(items: list, value: str) -> None:
 
 def skip(step: str, profile: dict) -> None:
     """«Любая»/«Любой» — стереть критерий этого шага."""
+    if step == "sources":
+        return
     if step == "role":
         profile["roles"] = [
             f"{direction}.{role}"
@@ -358,7 +377,11 @@ def apply(data: str, user: dict) -> str | None:
     elif data.startswith("trg:"):
         _toggle_from_all(profile, "regions", data[4:], [v for v, _ in prof.REGIONS])
     elif data.startswith("tsrc:"):
-        _toggle_from_all(profile, "sources", data[5:], _all_sources())
+        current = profile.get("sources") or _all_sources()
+        updated = list(current)
+        _toggle(updated, data[5:])
+        if not _set_sources(profile, updated):
+            return "Оставь включённым хотя бы один источник."
     elif data.startswith("tsrcgrp:"):
         group = SOURCE_GROUPS.get(data[8:])
         if group:
@@ -366,12 +389,11 @@ def apply(data: str, user: dict) -> str | None:
             current = profile.get("sources") or _all_sources()
             if all(key in current for key in available):
                 updated = [key for key in current if key not in available]
-                if not updated:
+                if not _set_sources(profile, updated):
                     return "Оставь включённой хотя бы одну группу источников."
-                profile["sources"] = updated
             else:
                 updated = list(dict.fromkeys(current + available))
-                profile["sources"] = [] if set(updated) == set(_all_sources()) else updated
+                _set_sources(profile, updated)
     elif data.startswith("tr:"):
         _toggle(profile.setdefault("roles", []), data[3:])
     elif data.startswith("tg:"):
