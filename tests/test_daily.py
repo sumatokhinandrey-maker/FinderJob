@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import main
 from api.send_digest import handler
-from finderjob import daily, store, wizard
+from finderjob import daily, store
 
 
 class MemoryRedis:
@@ -34,21 +34,23 @@ class MemoryRedis:
 
 
 class DailyTests(unittest.TestCase):
-    def test_single_page_replaces_previous_digest(self):
+    def test_single_page_digest_needs_no_paging_storage(self):
         with patch.object(store, "_command") as command:
             store.save_digest(42, ["Новая подборка"])
-        self.assertEqual(command.call_args.args[:2], ("SET", "finderjob:digest:42"))
+        command.assert_not_called()
 
-    def test_daily_digest_installs_filters_on_same_message(self):
+    def test_daily_digest_keeps_paging_under_message(self):
         user = {"chat_id": 42, "profile": {"roles": ["design.product"]}, "seen": {}}
-        with patch.object(store, "save_digest"), \
+        with patch.object(daily.core, "build_pages", return_value=["Стр. 1/2", "Стр. 2/2"]), \
+             patch.object(store, "save_digest") as save_digest, \
              patch.object(store, "save_user"), \
              patch.object(daily.stats, "track"), \
-             patch.object(daily.tg, "send", return_value=123) as send:
+             patch.object(daily.tg, "send") as send:
             self.assertEqual(daily.deliver(user, []), 0)
         send.assert_called_once()
-        self.assertEqual(send.call_args.args[2], wizard.menu_keyboard())
-        self.assertEqual(user["digest_message_id"], 123)
+        save_digest.assert_called_once_with(42, ["Стр. 1/2", "Стр. 2/2"])
+        self.assertEqual(send.call_args.args[2], daily.core.digest_keyboard(0, 2))
+        self.assertNotIn("digest_message_id", user)
 
     def test_endpoint_rejects_unauthorized_request(self):
         request = handler.__new__(handler)
@@ -121,8 +123,9 @@ class DailyTests(unittest.TestCase):
         send.assert_called_once()
         self.assertEqual(send.call_args.args[0], 1)
         self.assertIn('emoji-id="5206607081334906820"', send.call_args.args[1])
-        self.assertIn('href="https://t.me/finderjobupdate"', send.call_args.args[1])
-        self.assertEqual(send.call_args.args[2], wizard.menu_keyboard())
+        self.assertEqual(send.call_args.args[2][0][0]["url"], daily.NEWS_URL)
+        self.assertEqual(send.call_args.args[2][0][0]["icon_custom_emoji_id"],
+                         "5875465628285931233")
 
 
 if __name__ == "__main__":

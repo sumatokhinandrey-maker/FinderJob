@@ -15,10 +15,6 @@ class NavigationTests(unittest.TestCase):
         self.assertEqual(keyboard["keyboard"], [[{"text": "Фильтры"}]])
         self.assertTrue(keyboard["is_persistent"])
         self.assertFalse(keyboard["one_time_keyboard"])
-        self.assertEqual(wizard.menu_keyboard(4)["keyboard"], [
-            [{"text": "← Назад"}, {"text": "Далее →"}],
-            [{"text": "Фильтры"}],
-        ])
 
     def test_existing_menu_tap_does_not_send_service_message(self):
         chosen = profile.blank()
@@ -41,33 +37,21 @@ class NavigationTests(unittest.TestCase):
             self.assertEqual(send.call_count, 2)  # только карточки настроек
             self.assertEqual(delete.call_count, 2)
 
-    def test_page_buttons_replace_digest_and_keep_reply_keyboard(self):
-        user = {"chat_id": 42, "digest_message_id": 9, "digest_page": 0}
-        with patch.object(telegram, "_user", return_value=user), \
-             patch.object(telegram.store, "load_digest", return_value=["Стр. 1/2", "Стр. 2/2"]), \
-             patch.object(telegram.store, "save_user"), \
-             patch.object(telegram.tg, "send", return_value=10) as send, \
-             patch.object(telegram.tg, "delete") as delete:
-            telegram.handle_message({"chat": {"id": 42}, "message_id": 8,
-                                     "text": wizard.NEXT_PAGE_TEXT})
-        send.assert_called_once_with(42, "Стр. 2/2", wizard.menu_keyboard(2))
-        self.assertEqual([call.args[1] for call in delete.call_args_list], [8, 9])
-        self.assertEqual(user["digest_message_id"], 10)
-        self.assertEqual(user["digest_page"], 1)
-
-    def test_first_digest_installs_filters_without_extra_prompt(self):
+    def test_first_digest_uses_inline_paging_without_extra_prompt(self):
         user = {"chat_id": 42, "profile": profile.blank(), "seen": {},
                 "menu_installed": 2}
         with patch.object(telegram.store, "load_pool", return_value=([{}], "2000-01-01")), \
              patch.object(telegram.core, "from_rows", return_value=[]), \
-             patch.object(telegram.store, "save_digest"), \
+             patch.object(telegram.core, "build_pages", return_value=["Стр. 1/2", "Стр. 2/2"]), \
+             patch.object(telegram.store, "save_digest") as save_digest, \
              patch.object(telegram.store, "save_user"), \
              patch.object(telegram.stats, "track"), \
              patch.object(telegram.tg, "send", return_value=123) as send:
             telegram.first_digest(user)
         send.assert_called_once()
-        self.assertEqual(send.call_args.args[2], wizard.menu_keyboard())
-        self.assertEqual(user["digest_message_id"], 123)
+        save_digest.assert_called_once_with(42, ["Стр. 1/2", "Стр. 2/2"])
+        self.assertEqual(send.call_args.args[2], core.digest_keyboard(0, 2))
+        self.assertNotIn("digest_message_id", user)
 
     def test_digest_only_shows_page_navigation(self):
         self.assertEqual(core.digest_keyboard(0, 1), [])
@@ -75,6 +59,19 @@ class NavigationTests(unittest.TestCase):
         self.assertEqual(keyboard[0][0]["callback_data"], "dg:1")
         self.assertFalse(any(button["callback_data"] == "filters:open"
                              for row in keyboard for button in row))
+
+    def test_next_page_edits_digest_without_sending_another_message(self):
+        callback = {"id": "callback", "data": "dg:1",
+                    "message": {"chat": {"id": 42}, "message_id": 9}}
+        with patch.object(telegram.store, "load_digest",
+                          return_value=["Стр. 1/2", "Стр. 2/2"]), \
+             patch.object(telegram.tg, "edit") as edit, \
+             patch.object(telegram.tg, "send") as send, \
+             patch.object(telegram.tg, "answer_callback") as answer:
+            telegram.handle_callback(callback)
+        edit.assert_called_once_with(42, 9, "Стр. 2/2", core.digest_keyboard(1, 2))
+        send.assert_not_called()
+        answer.assert_called_once_with("callback")
 
     def test_filters_card_and_custom_button_icons(self):
         chosen = profile.blank()

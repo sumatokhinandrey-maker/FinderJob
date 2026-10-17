@@ -202,7 +202,9 @@ def load_linkedin() -> list[dict]:
 
 
 def save_digest(chat_id: int | str, pages: list[str]) -> None:
-    """Страницы последнего дайджеста для листания и возврата из фильтров."""
+    """Страницы последнего дайджеста для кнопок «Далее» и «Назад»."""
+    if len(pages) <= 1:
+        return
     _command(
         "SET", f"finderjob:digest:{chat_id}",
         json.dumps(pages, ensure_ascii=False), "EX", 7 * 24 * 3600,

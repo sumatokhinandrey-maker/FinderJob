@@ -276,17 +276,9 @@ def format_region_keyboard() -> list[list[dict]]:
     ]
 
 
-PREV_PAGE_TEXT = "← Назад"
-NEXT_PAGE_TEXT = "Далее →"
-
-
-def menu_keyboard(pages: int = 1) -> dict:
-    rows = []
-    if pages > 1:
-        rows.append([{"text": PREV_PAGE_TEXT}, {"text": NEXT_PAGE_TEXT}])
-    rows.append([{"text": MENU_BUTTON_TEXT}])
+def menu_keyboard() -> dict:
     return {
-        "keyboard": rows,
+        "keyboard": [[{"text": MENU_BUTTON_TEXT}]],
         "resize_keyboard": True,
         "is_persistent": True,
         "one_time_keyboard": False,
