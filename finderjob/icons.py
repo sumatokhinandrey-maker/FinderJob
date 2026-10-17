@@ -9,4 +9,8 @@ FILTER_ICONS = {
     "sources": ("🔎", "5874960879434338403"),
 }
 
-FALLBACK_BY_ID = {custom_id: emoji for emoji, custom_id in FILTER_ICONS.values()}
+MENU_ICON = ("🎛️", "5875431869842985304")
+
+FALLBACK_BY_ID = {
+    custom_id: emoji for emoji, custom_id in (*FILTER_ICONS.values(), MENU_ICON)
+}

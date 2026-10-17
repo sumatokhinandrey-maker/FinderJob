@@ -39,7 +39,7 @@ def first_digest(user: dict, install_menu: bool = False) -> None:
             wizard.menu_keyboard() if install_menu else None,
         )
         if install_menu:
-            user["menu_installed"] = True
+            user["menu_installed"] = wizard.MENU_VERSION
             store.save_user(user)
         return
 
@@ -53,9 +53,9 @@ def first_digest(user: dict, install_menu: bool = False) -> None:
     tg.send(user["chat_id"], pages[0], core.digest_keyboard(0, len(pages)))
     if collected_at == daily.moscow_day():
         store.mark_delivery_sent(user["chat_id"], collected_at)
-    if install_menu and not user.get("menu_installed"):
+    if install_menu and user.get("menu_installed") != wizard.MENU_VERSION:
         tg.send(user["chat_id"], wizard.MENU_PROMPT, wizard.menu_keyboard())
-        user["menu_installed"] = True
+        user["menu_installed"] = wizard.MENU_VERSION
     stats.track("digest_sent")
     stats.track("vacancies_sent", len(fresh))
 
@@ -123,10 +123,10 @@ def _configured(user: dict) -> bool:
 
 
 def _ensure_menu_keyboard(user: dict, chat_id: int, force: bool = False) -> None:
-    if user.get("menu_installed") and not force:
+    if user.get("menu_installed") == wizard.MENU_VERSION and not force:
         return
     tg.send(chat_id, wizard.MENU_PROMPT, wizard.menu_keyboard())
-    user["menu_installed"] = True
+    user["menu_installed"] = wizard.MENU_VERSION
 
 
 def _show_filters(user: dict, chat_id: int, install_menu: bool = False) -> None:
@@ -137,10 +137,10 @@ def _show_filters(user: dict, chat_id: int, install_menu: bool = False) -> None:
     body, keyboard = wizard.render_settings(
         user["profile"], user.get("pending_first_search", False)
     )
-    if install_menu or not user.get("menu_installed"):
+    if install_menu or user.get("menu_installed") != wizard.MENU_VERSION:
         _ensure_menu_keyboard(user, chat_id, force=install_menu)
     tg.send(chat_id, body, keyboard)
-    user["menu_installed"] = True
+    user["menu_installed"] = wizard.MENU_VERSION
     store.save_user(user)
 
 
@@ -152,7 +152,7 @@ def handle_message(message: dict) -> None:
 
     # Команда или кнопка меню своё дело сделали, в переписке оставлять их
     # не нужно: ответ бота показывает результат. Убираем до разбора.
-    if (text.startswith("/") or text == "Фильтры") and message.get("message_id"):
+    if (text.startswith("/") or text in wizard.MENU_BUTTON_TEXTS) and message.get("message_id"):
         tg.delete(chat["id"], message["message_id"])
 
     if text.startswith("/stop"):
@@ -172,11 +172,11 @@ def handle_message(message: dict) -> None:
             _open_step(user, user["step"], "setup")
         else:
             tg.send(chat["id"], wizard.WELCOME, wizard.menu_keyboard())
-            user["menu_installed"] = True
+            user["menu_installed"] = wizard.MENU_VERSION
             store.save_user(user)
         return
 
-    if text in ("Фильтры", "/filters", "/settings"):
+    if text in (*wizard.MENU_BUTTON_TEXTS, "/filters", "/settings"):
         if not _configured(user):
             _ensure_menu_keyboard(user, chat["id"], force=text.startswith("/"))
             _open_step(user, user.get("step") or "direction", "setup")

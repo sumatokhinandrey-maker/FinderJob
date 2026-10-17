@@ -12,9 +12,34 @@ from finderjob import icons, profile, tg, wizard
 class NavigationTests(unittest.TestCase):
     def test_filters_keyboard_stays_available(self):
         keyboard = wizard.menu_keyboard()
-        self.assertEqual(keyboard["keyboard"], [[{"text": "Фильтры"}]])
+        self.assertEqual(keyboard["keyboard"], [[{
+            "text": "Фильтры",
+            "icon_custom_emoji_id": "5875431869842985304",
+        }]])
         self.assertTrue(keyboard["is_persistent"])
         self.assertFalse(keyboard["one_time_keyboard"])
+
+    def test_existing_menu_upgrades_on_next_filters_tap(self):
+        chosen = profile.blank()
+        chosen["grades"] = ["middle"]
+        user = {"chat_id": 42, "profile": chosen, "menu_installed": True}
+        with patch.object(telegram, "_user", return_value=user), \
+             patch.object(telegram.store, "save_user"), \
+             patch.object(telegram.stats, "track"), \
+             patch.object(telegram.tg, "delete") as delete, \
+             patch.object(telegram.tg, "send") as send:
+            telegram.handle_message({
+                "chat": {"id": 42}, "message_id": 7, "text": "Фильтры",
+            })
+            self.assertEqual(send.call_count, 2)
+            self.assertEqual(send.call_args_list[0].args[2], wizard.menu_keyboard())
+            self.assertEqual(user["menu_installed"], wizard.MENU_VERSION)
+
+            telegram.handle_message({
+                "chat": {"id": 42}, "message_id": 8, "text": "🎛️ Фильтры",
+            })
+            self.assertEqual(send.call_count, 3)  # только карточка настроек
+            self.assertEqual(delete.call_count, 2)
 
     def test_digest_only_shows_page_navigation(self):
         self.assertEqual(core.digest_keyboard(0, 1), [])
@@ -170,6 +195,16 @@ class NavigationTests(unittest.TestCase):
             tg.edit(42, 1, "Фильтры", keyboard)
         second = call.call_args_list[1].kwargs["reply_markup"]["inline_keyboard"][1][0]
         self.assertEqual(second["text"], "🪙 Вилка")
+        self.assertNotIn("icon_custom_emoji_id", second)
+
+    def test_menu_icon_falls_back_to_plain_emoji(self):
+        with patch.object(tg, "call", side_effect=[RuntimeError("custom emoji unavailable"),
+                                                   {"message_id": 1}]) as call:
+            self.assertEqual(tg.send(42, "Меню", wizard.menu_keyboard()), 1)
+        first = call.call_args_list[0].kwargs["reply_markup"]["keyboard"][0][0]
+        second = call.call_args_list[1].kwargs["reply_markup"]["keyboard"][0][0]
+        self.assertEqual(first["icon_custom_emoji_id"], icons.MENU_ICON[1])
+        self.assertEqual(second["text"], "🎛️ Фильтры")
         self.assertNotIn("icon_custom_emoji_id", second)
 
     def test_digest_button_opens_current_filters(self):
