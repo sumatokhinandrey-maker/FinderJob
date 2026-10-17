@@ -262,6 +262,7 @@ def menu_keyboard() -> dict:
         "keyboard": [[{"text": "Фильтры"}]],
         "resize_keyboard": True,
         "is_persistent": True,
+        "one_time_keyboard": False,
     }
 
 

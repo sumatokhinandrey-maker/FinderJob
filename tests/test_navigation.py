@@ -1,4 +1,4 @@
-"""Доступ к фильтрам при скрытой клавиатуре Telegram."""
+"""Доступ к фильтрам без системного меню команд Telegram."""
 
 import unittest
 from unittest.mock import patch
@@ -6,9 +6,16 @@ from unittest.mock import patch
 import core
 import setup_bot
 from api import telegram
+from finderjob import wizard
 
 
 class NavigationTests(unittest.TestCase):
+    def test_filters_keyboard_stays_available(self):
+        keyboard = wizard.menu_keyboard()
+        self.assertEqual(keyboard["keyboard"], [[{"text": "Фильтры"}]])
+        self.assertTrue(keyboard["is_persistent"])
+        self.assertFalse(keyboard["one_time_keyboard"])
+
     def test_every_digest_has_filters_button(self):
         self.assertEqual(
             core.digest_keyboard(0, 1),
@@ -32,15 +39,17 @@ class NavigationTests(unittest.TestCase):
             show.assert_called_once_with(user, 42)
             answer.assert_called_once_with("callback")
 
-    def test_setup_restores_menu_without_messages(self):
+    def test_setup_removes_commands_without_messages(self):
         with patch.object(setup_bot, "load_env"), \
              patch.object(setup_bot.store, "all_users", return_value=[{"chat_id": 42}]), \
              patch.object(setup_bot.tg, "call", return_value={"description": "bot"}) as call, \
              patch.object(setup_bot.tg, "send") as send, \
              patch.object(setup_bot.time, "sleep"):
             self.assertEqual(setup_bot.main(), 0)
-            self.assertIn("setMyCommands", [c.args[0] for c in call.call_args_list])
-            self.assertIn("setChatMenuButton", [c.args[0] for c in call.call_args_list])
+            self.assertIn("deleteMyCommands", [c.args[0] for c in call.call_args_list])
+            self.assertNotIn("setMyCommands", [c.args[0] for c in call.call_args_list])
+            call.assert_any_call("setChatMenuButton", menu_button={"type": "default"})
+            call.assert_any_call("deleteMyCommands", scope={"type": "chat", "chat_id": 42})
             send.assert_not_called()
 
 
