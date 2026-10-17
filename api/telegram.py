@@ -313,7 +313,6 @@ def handle_callback(callback: dict) -> None:
         user["pending_first_search"] = False
         user["mode"] = "setup"
         user["step"] = "direction"
-        tg.send(chat["id"], "Настройка сброшена.")
         body, keyboard = wizard.render("direction", profile, "setup")
 
     elif data.startswith("ed:"):

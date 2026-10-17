@@ -62,6 +62,30 @@ class NavigationTests(unittest.TestCase):
         self.assertEqual(chosen["sources"], ["hh"])
         self.assertIn("🔎 Источники: все", profile.summary(profile.blank()))
 
+    def test_salary_buttons_show_rubles_and_region_has_no_any_button(self):
+        salary = wizard.keyboard("salary", profile.blank(), "edit")
+        self.assertEqual(salary[0][0]["text"], "от 100 000 ₽")
+        self.assertEqual(salary[1][1]["text"], "от 250 000 ₽")
+        region = wizard.keyboard("region", profile.blank(), "edit")
+        self.assertFalse(any(button["callback_data"] == "sk:region"
+                             for row in region for button in row))
+
+    def test_reset_edits_card_without_extra_message(self):
+        user = {"chat_id": 42, "profile": profile.blank(), "setup_complete": True}
+        callback = {
+            "id": "callback", "data": "reset:confirm",
+            "message": {"chat": {"id": 42}, "message_id": 9},
+        }
+        with patch.object(telegram, "_user", return_value=user), \
+             patch.object(telegram.store, "save_user"), \
+             patch.object(telegram.tg, "edit") as edit, \
+             patch.object(telegram.tg, "send") as send, \
+             patch.object(telegram.tg, "answer_callback"):
+            telegram.handle_callback(callback)
+        edit.assert_called_once()
+        self.assertIn("Шаг 1 из 6. Направление", edit.call_args.args[2])
+        send.assert_not_called()
+
     def test_single_page_digest_has_no_empty_inline_markup(self):
         with patch.object(tg, "call", return_value={"message_id": 1}) as call:
             tg.send(42, "Дайджест", core.digest_keyboard(0, 1))

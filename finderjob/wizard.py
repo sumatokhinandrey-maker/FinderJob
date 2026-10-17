@@ -22,7 +22,6 @@ STEPS = ["direction", "role", "grade", "salary", "format", "region"]
 SKIP_LABEL = {
     "salary": "Любая",
     "format": "Выбрать всё",
-    "region": "Любой",
 }
 
 CHECK = "✓ "  # галочка перед выбранным пунктом
@@ -234,7 +233,7 @@ def keyboard(step: str, profile: dict, mode: str) -> list[list[dict]]:
         current = profile.get("salary_min")
         buttons = [
             _button(
-                f"{CHECK if current == value else ''}от {value // 1000} 000",
+                f"{CHECK if current == value else ''}от {value // 1000} 000 ₽",
                 f"ts:{value}",
             )
             for value in SALARY_STEPS
