@@ -12,17 +12,14 @@ from finderjob import icons, profile, tg, wizard
 class NavigationTests(unittest.TestCase):
     def test_filters_keyboard_stays_available(self):
         keyboard = wizard.menu_keyboard()
-        self.assertEqual(keyboard["keyboard"], [[{
-            "text": "Фильтры",
-            "icon_custom_emoji_id": "5875431869842985304",
-        }]])
+        self.assertEqual(keyboard["keyboard"], [[{"text": "Фильтры"}]])
         self.assertTrue(keyboard["is_persistent"])
         self.assertFalse(keyboard["one_time_keyboard"])
 
     def test_existing_menu_upgrades_on_next_filters_tap(self):
         chosen = profile.blank()
         chosen["grades"] = ["middle"]
-        user = {"chat_id": 42, "profile": chosen, "menu_installed": True}
+        user = {"chat_id": 42, "profile": chosen, "menu_installed": 2}
         with patch.object(telegram, "_user", return_value=user), \
              patch.object(telegram.store, "save_user"), \
              patch.object(telegram.stats, "track"), \
@@ -197,15 +194,12 @@ class NavigationTests(unittest.TestCase):
         self.assertEqual(second["text"], "🪙 Вилка")
         self.assertNotIn("icon_custom_emoji_id", second)
 
-    def test_menu_icon_falls_back_to_plain_emoji(self):
-        with patch.object(tg, "call", side_effect=[RuntimeError("custom emoji unavailable"),
-                                                   {"message_id": 1}]) as call:
+    def test_menu_button_sends_without_custom_emoji(self):
+        with patch.object(tg, "call", return_value={"message_id": 1}) as call:
             self.assertEqual(tg.send(42, "Меню", wizard.menu_keyboard()), 1)
-        first = call.call_args_list[0].kwargs["reply_markup"]["keyboard"][0][0]
-        second = call.call_args_list[1].kwargs["reply_markup"]["keyboard"][0][0]
-        self.assertEqual(first["icon_custom_emoji_id"], icons.MENU_ICON[1])
-        self.assertEqual(second["text"], "🎛️ Фильтры")
-        self.assertNotIn("icon_custom_emoji_id", second)
+        self.assertEqual(call.call_count, 1)
+        button = call.call_args.kwargs["reply_markup"]["keyboard"][0][0]
+        self.assertEqual(button, {"text": "Фильтры"})
 
     def test_digest_button_opens_current_filters(self):
         callback = {
