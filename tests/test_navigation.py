@@ -37,6 +37,42 @@ class NavigationTests(unittest.TestCase):
             self.assertEqual(send.call_count, 2)  # только карточки настроек
             self.assertEqual(delete.call_count, 2)
 
+    def test_new_user_gets_setup_button_before_persistent_filters(self):
+        user = profile.new_user(42, None, "2026-10-18")
+        with patch.object(telegram, "_user", return_value=user), \
+             patch.object(telegram.stats, "track"), \
+             patch.object(telegram.tg, "send") as send:
+            telegram.handle_message({"chat": {"id": 42}, "text": "/start"})
+        send.assert_called_once_with(42, wizard.WELCOME, [[{
+            "text": "Настроить подборку", "callback_data": "onb:start",
+        }]])
+
+    def test_commands_restore_keyboard_even_when_marked_installed(self):
+        for command in ("/start", "/filters", "/settings"):
+            with self.subTest(command=command):
+                user = {"chat_id": 42, "profile": profile.blank(),
+                        "setup_complete": True, "menu_installed": wizard.MENU_VERSION}
+                with patch.object(telegram, "_user", return_value=user), \
+                     patch.object(telegram.store, "save_user"), \
+                     patch.object(telegram.stats, "track"), \
+                     patch.object(telegram.tg, "send") as send:
+                    telegram.handle_message({"chat": {"id": 42}, "text": command})
+                self.assertEqual(send.call_count, 2)
+                self.assertEqual(send.call_args_list[0].args,
+                                 (42, wizard.HELP, wizard.menu_keyboard()))
+                self.assertEqual(send.call_args_list[1].args,
+                                 (42, *wizard.render_settings(user["profile"])))
+
+    def test_review_menu_opens_filters_even_with_empty_legacy_grades(self):
+        user = {"chat_id": 42, "profile": profile.blank(),
+                "pending_first_search": True}
+        with patch.object(telegram, "_user", return_value=user), \
+             patch.object(telegram.store, "save_user"), \
+             patch.object(telegram.stats, "track"), \
+             patch.object(telegram.tg, "send") as send:
+            telegram.handle_message({"chat": {"id": 42}, "text": "Фильтры"})
+        send.assert_called_once_with(42, *wizard.render_settings(user["profile"], True))
+
     def test_first_digest_uses_inline_paging_without_extra_prompt(self):
         user = {"chat_id": 42, "profile": profile.blank(), "seen": {},
                 "menu_installed": 2}
@@ -177,7 +213,7 @@ class NavigationTests(unittest.TestCase):
             self.assertEqual(user["mode"], "review")
             self.assertEqual(keyboard[0][0]["callback_data"], "search:find")
             digest.assert_not_called()
-            send.assert_not_called()
+            send.assert_called_once_with(42, wizard.HELP, wizard.menu_keyboard())
 
             press("search:find")
             digest.assert_called_once_with(user)

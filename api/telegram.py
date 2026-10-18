@@ -115,7 +115,16 @@ def _user(chat: dict) -> dict:
 
 
 def _configured(user: dict) -> bool:
-    return bool(user.get("setup_complete") or (user.get("profile") or {}).get("grades"))
+    return bool(user.get("setup_complete") or user.get("pending_first_search")
+                or (user.get("profile") or {}).get("grades"))
+
+
+def _restore_menu(user: dict) -> None:
+    # Отдельное сообщение: карточки с inline-кнопками нельзя использовать
+    # как носитель reply-клавиатуры. Этот ответ не редактируем и не удаляем.
+    tg.send(user["chat_id"], wizard.HELP, wizard.menu_keyboard())
+    user["menu_installed"] = wizard.MENU_VERSION
+    store.save_user(user)
 
 
 def _show_filters(user: dict, chat_id: int) -> None:
@@ -152,13 +161,13 @@ def handle_message(message: dict) -> None:
     if text.startswith("/start"):
         stats.track("start")
         if _configured(user):
+            _restore_menu(user)
             _show_filters(user, chat["id"])
         elif user.get("step"):
             _open_step(user, user["step"], "setup")
         else:
-            tg.send(chat["id"], wizard.WELCOME, wizard.menu_keyboard())
-            user["menu_installed"] = wizard.MENU_VERSION
-            store.save_user(user)
+            tg.send(chat["id"], wizard.WELCOME,
+                    [[{"text": "Настроить подборку", "callback_data": "onb:start"}]])
         return
 
     if text in (*wizard.MENU_BUTTON_TEXTS, "/filters", "/settings"):
@@ -166,6 +175,8 @@ def handle_message(message: dict) -> None:
             _open_step(user, user.get("step") or "direction", "setup")
             return
         stats.track("settings")
+        if text.startswith("/"):
+            _restore_menu(user)
         _show_filters(user, chat["id"])
         return
 
@@ -177,9 +188,10 @@ def handle_message(message: dict) -> None:
         tg.send(chat["id"], stats.report())
         return
 
-    tg.send(chat["id"], wizard.HELP, wizard.menu_keyboard())
-    user["menu_installed"] = wizard.MENU_VERSION
-    store.save_user(user)
+    if _configured(user):
+        _restore_menu(user)
+    else:
+        _open_step(user, user.get("step") or "direction", "setup")
 
 
 def _turn_page(chat_id: int, message_id: int | None, where: str) -> None:
@@ -239,6 +251,7 @@ def handle_callback(callback: dict) -> None:
         return
 
     finished = False
+    setup_review = False
     edited = False
     notice = ""
 
@@ -379,6 +392,7 @@ def handle_callback(callback: dict) -> None:
                 body, keyboard = wizard.render(following, profile, "setup")
             else:
                 body, keyboard = wizard.render_review(profile)
+                setup_review = not user.get("pending_first_search")
                 user["pending_first_search"] = True
                 user["mode"] = "review"
 
@@ -397,6 +411,9 @@ def handle_callback(callback: dict) -> None:
     else:
         tg.send(chat["id"], body, keyboard)
     tg.answer_callback(callback["id"], notice)
+
+    if setup_review:
+        _restore_menu(user)
 
     if finished:
         first_digest(user)
