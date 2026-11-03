@@ -47,6 +47,27 @@ def moscow_day() -> str:
     return datetime.now(MOSCOW).date().isoformat()
 
 
+# Рассылать можно только в дневном окне по Москве. Замок «раз в день» держится
+# на дате по Москве, а она переворачивается в полночь — в 21:00 UTC. Поэтому
+# запуск, опоздавший до ночи (у GitHub расписание плавает на часы), попадал
+# уже в следующие московские сутки: 23:06 UTC 02.11 — это 02:06 МСК 03.11,
+# для замка новый день, и бот слал завтрашний дайджест за семь часов до срока
+# (02.11.2026 так и вышло — пришёл в 06:06 по Бангкоку). Окно это закрывает:
+# штатная отправка в 09:00, догоняющие до 16:37, всё остальное — не время.
+SEND_FROM_HOUR = 9
+SEND_TO_HOUR = 20
+
+
+def send_window_open() -> bool:
+    return SEND_FROM_HOUR <= datetime.now(MOSCOW).hour < SEND_TO_HOUR
+
+
+def send_window_note() -> str:
+    now = datetime.now(MOSCOW)
+    return (f"Сейчас {now:%H:%M} МСК — вне окна рассылки "
+            f"({SEND_FROM_HOUR:02d}:00–{SEND_TO_HOUR:02d}:00), не отправляю.")
+
+
 def deliver(user: dict, vacancies: list, cap: int = 0,
             dry_run: bool = False, claim: str | None = None,
             track: bool = True) -> int:
@@ -97,6 +118,9 @@ def deliver(user: dict, vacancies: list, cap: int = 0,
 
 def send_prepared() -> tuple[int, int]:
     """Отправить только сегодняшний запас; старый запас не рассылать."""
+    if not send_window_open():
+        print(send_window_note())
+        return 0, 0
     today = moscow_day()
     rows, collected_at = store.load_pool()
     if collected_at != today or not rows:

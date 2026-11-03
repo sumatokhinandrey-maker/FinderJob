@@ -81,6 +81,13 @@ def main() -> int:
     if args.send_prepared and args.dry_run:
         parser.error("--send-prepared нельзя сочетать с --dry-run")
     if args.send_prepared:
+        # Вне дневного окна не шлём и не пересобираем: поздний ночной запуск
+        # иначе уходил в следующие московские сутки и слал завтрашний дайджест
+        # раньше срока. Замок — внутри send_prepared, здесь дублируем, чтобы
+        # не молотить сбор на 40 минут впустую.
+        if not daily.send_window_open():
+            print(daily.send_window_note())
+            return 0
         rows, collected_at = store.load_pool()
         if rows and collected_at == daily.moscow_day():
             daily.send_prepared()
